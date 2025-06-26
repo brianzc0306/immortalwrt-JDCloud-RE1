@@ -32,3 +32,18 @@ sysctl -w net.ipv4.tcp_congestion_control=bbr
 sysctl -p
 
 echo "BBR 拥塞控制已启用并保存到 sysctl 配置文件"
+
+# 添加防火墙规则：允许从 wan 接口，端口范围为 53381-53399 的流量
+uci add firewall rule
+uci set firewall.@rule[-1].src='wan'
+uci set firewall.@rule[-1].name='Lucky'
+uci set firewall.@rule[-1].src_port='53381-53399'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# 提交防火墙配置
+uci commit firewall
+
+# 重启防火墙服务使规则生效
+/etc/init.d/firewall restart
+
+echo "防火墙规则 'Lucky' 已添加，允许端口 53381-53399 的流量通过。"
