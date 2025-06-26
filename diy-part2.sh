@@ -15,49 +15,89 @@ sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generat
 # Modify default theme
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
-# 确保脚本在超级用户权限下运行
-if [ $(id -u) -ne 0 ]; then
-    echo "此脚本需要 root 权限，请使用 sudo 运行"
+#!/bin/bash
+
+# ===== BBR 拥塞控制配置 =====
+BBR_CONF="files/etc/sysctl.d/99-bbr.conf"
+mkdir -p files/etc/sysctl.d
+
+# 创建/覆盖 BBR 配置
+cat > "$BBR_CONF" << EOF
+# BBR 拥塞控制优化
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+
+# 系统性能优化
+vm.max_map_count = 262144
+fs.inotify.max_user_watches = 524288
+fs.inotify.max_user_instances = 512
+vm.mmap_rnd_bits = 16
+EOF
+
+echo "✅ BBR 拥塞控制及系统优化配置已写入 $BBR_CONF"
+
+# ===== 防火墙规则添加 =====
+FIREWALL_CONF="files/etc/config/firewall"
+mkdir -p files/etc/config
+
+# 检测防火墙配置是否存在
+if [ -f "$FIREWALL_CONF" ]; then
+    echo "ℹ️ 检测到已存在的防火墙配置: $FIREWALL_CONF"
+    echo "ℹ️ 将在现有配置基础上追加 Lucky 端口规则"
+    BACKUP_FILE="${FIREWALL_CONF}.pre-lucky"
+    cp "$FIREWALL_CONF" "$BACKUP_FILE"
+    echo "ℹ️ 已创建配置文件备份: $BACKUP_FILE"
+else
+    echo "ℹ️ 未检测到防火墙配置，将创建基础配置"
+    # 创建基础防火墙配置
+    cat > "$FIREWALL_CONF" << 'EOF'
+config defaults
+    option syn_flood '1'
+    option input 'ACCEPT'
+    option output 'ACCEPT'
+    option forward 'REJECT'
+
+config zone
+    option name 'lan'
+    option input 'ACCEPT'
+    option output 'ACCEPT'
+    option forward 'ACCEPT'
+    option network 'lan'
+
+config zone
+    option name 'wan'
+    option input 'REJECT'
+    option output 'ACCEPT'
+    option forward 'REJECT'
+    option masq '1'
+    option mtu_fix '1'
+    option network 'wan wan6'
+EOF
+fi
+
+# 添加 Lucky 端口规则
+echo "
+# Lucky 端口规则 (由 diy-part2.sh 添加)
+config rule
+    option name 'Lucky'
+    option src 'wan'
+    option proto 'tcp udp'
+    option dest_port '53381-53399'
+    option target 'ACCEPT'" >> "$FIREWALL_CONF"
+
+# 检查规则是否添加成功
+if grep -q "Lucky" "$FIREWALL_CONF"; then
+    echo "✅ 防火墙规则 'Lucky' 已成功添加，允许端口 53381-53399 的流量通过"
+else
+    echo "❌ 警告：未能成功添加防火墙规则，请手动检查 $FIREWALL_CONF"
     exit 1
 fi
 
-echo "安装 opkg 和 uci 工具..."
-# 安装 opkg 和 uci
-if ! command -v opkg &> /dev/null; then
-    echo "opkg 未安装，正在安装..."
-    # 安装 opkg（根据 OpenWrt 版本选择合适的命令）
-    opkg update && opkg install opkg uci
-else
-    echo "opkg 已安装"
-fi
-
-echo "安装防火墙服务..."
-# 确保防火墙服务已安装
-if ! command -v firewall &> /dev/null; then
-    echo "防火墙未安装，正在安装..."
-    opkg update && opkg install firewall
-else
-    echo "防火墙服务已安装"
-fi
-
-# 设置 sysctl 参数
-echo "配置 sysctl 参数..."
-echo "net.ipv4.tcp_congestion_control = bbr" | tee -a /etc/sysctl.conf
-echo "net.core.default_qdisc = fq" | tee -a /etc/sysctl.conf
-
-# 应用配置
-sysctl -p
-
-# 添加防火墙规则
-echo "添加防火墙规则 'Lucky'..."
-uci add firewall rule
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].name='Lucky'
-uci set firewall.@rule[-1].src_port='53381-53399'
-uci set firewall.@rule[-1].target='ACCEPT'
-
-# 重启防火墙服务以应用规则
-/etc/init.d/firewall restart
-
-echo "BBR 拥塞控制已启用并保存到 sysctl 配置文件"
-echo "防火墙规则 'Lucky' 已添加，允许端口 53381-53399 的流量通过。"
+# 最终状态报告
+echo ""
+echo "==============================="
+echo "配置完成状态报告:"
+echo "1. BBR 配置: $( [ -f "$BBR_CONF" ] && echo "已安装" || echo "缺失" )"
+echo "2. 防火墙配置: $( [ -f "$FIREWALL_CONF" ] && echo "已存在" || echo "缺失" )"
+echo "3. Lucky 规则: $(grep -q "Lucky" "$FIREWALL_CONF" && echo "已添加" || echo "未检测到")"
+echo "==============================="
