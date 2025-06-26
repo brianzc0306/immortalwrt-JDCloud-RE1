@@ -15,21 +15,20 @@ sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generat
 # Modify default theme
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
-# 添加 BBR 加速
-echo "配置 BBR 加速..."
-sed -i '/net.core.default_qdisc/d' /etc/sysctl.conf
-sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.conf
+# BBR 加速
 echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
+sysctl -p >/dev/null
 
-# 添加防火墙规则
-echo "添加防火墙规则..."
-uci add firewall rule >/dev/null
-uci set firewall.@rule[-1].src='wan'
+# 防火墙规则
+uci add firewall rule
+uci set firewall.@rule[-1]=rule
 uci set firewall.@rule[-1].name='Lucky'
+uci set firewall.@rule[-1].src='wan'
 uci set firewall.@rule[-1].src_port='53381-53399'
 uci set firewall.@rule[-1].proto='tcp udp'
 uci set firewall.@rule[-1].target='ACCEPT'
 uci commit firewall
+# ===================================
 
-echo "配置完成！"
+echo "diy-part2.sh 执行完毕！"
