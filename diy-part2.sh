@@ -15,20 +15,37 @@ sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generat
 # Modify default theme
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
-# BBR 加速
-echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
-echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
-sysctl -p >/dev/null
 
-# 防火墙规则
-uci add firewall rule
-uci set firewall.@rule[-1]=rule
-uci set firewall.@rule[-1].name='Lucky'
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].src_port='53381-53399'
-uci set firewall.@rule[-1].proto='tcp udp'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci commit firewall
-# ===================================
+# 移动自定义文件
+[ -e files ] && mv files openwrt/files
 
-echo "diy-part2.sh 执行完毕！"
+# =====================
+# 配置 BBR 加速 
+# =====================
+echo "配置 BBR 加速..."
+
+# 创建自定义 sysctl 配置文件
+mkdir -p openwrt/package/base-files/files/etc/sysctl.d
+cat > openwrt/package/base-files/files/etc/sysctl.d/60-bbr.conf << 'EOF'
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+EOF
+
+# =====================
+# 添加防火墙规则 
+# =====================
+echo "添加防火墙规则..."
+
+# 创建防火墙规则文件
+mkdir -p openwrt/package/network/config/firewall/files
+cat >> openwrt/package/network/config/firewall/files/firewall.config << 'EOF'
+
+config rule
+    option name 'Lucky'
+    option src 'wan'
+    option src_port '53381-53399'
+    option proto 'tcp udp'
+    option target 'ACCEPT'
+EOF
+
+echo "配置完成！"
