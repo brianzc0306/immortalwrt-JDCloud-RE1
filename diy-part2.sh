@@ -20,6 +20,15 @@ sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generat
 # Modify default theme
 #sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
 
-# Modify hostname
-#git clone https://github.com/gdy666/luci-app-lucky.git package/luci-app-lucky
-#git clone https://github.com/morytyann/OpenWrt-mihomo.git package/luci-app-mihomo
+# 添加 BBR 配置到 /etc/sysctl.conf
+echo "net.core.default_qdisc=fq" >> /etc/sysctl.conf
+echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.conf
+
+# 立即应用 BBR 设置
+sysctl -w net.core.default_qdisc=fq
+sysctl -w net.ipv4.tcp_congestion_control=bbr
+
+# 重新加载 sysctl 配置以生效
+sysctl -p
+
+echo "BBR 拥塞控制已启用并保存到 sysctl 配置文件"
