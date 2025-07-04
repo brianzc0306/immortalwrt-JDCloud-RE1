@@ -72,12 +72,6 @@ start_service() {
     grep -q "net.ipv4.tcp_wmem" /etc/sysctl.conf || echo "net.ipv4.tcp_wmem = 4096 16384 16777216" >> /etc/sysctl.conf
     grep -q "net.ipv4.tcp_mtu_probing" /etc/sysctl.conf || echo "net.ipv4.tcp_mtu_probing = 1" >> /etc/sysctl.conf
     
-    # 确保irqbalance运行
-    if [ -f "/etc/init.d/irqbalance" ]; then
-        /etc/init.d/irqbalance enable >/dev/null 2>&1
-        /etc/init.d/irqbalance start >/dev/null 2>&1
-        echo "已启用irqbalance中断优化"
-    fi
     
     # 添加Lucky防火墙规则
     apply_lucky_firewall_rules
@@ -132,7 +126,6 @@ echo "TCP Fast Open: $(sysctl -n net.ipv4.tcp_fastopen 2>/dev/null || echo '未�
 echo "接收缓冲区: $(sysctl -n net.core.rmem_max 2>/dev/null || echo '未设置')"
 echo "发送缓冲区: $(sysctl -n net.core.wmem_max 2>/dev/null || echo '未设置')"
 echo "BBR模块状态: $(lsmod | grep -c bbr)"
-echo "irqbalance状态: $(if [ -f /etc/init.d/irqbalance ]; then service irqbalance status | grep -c running; else echo '未安装'; fi)"
 
 echo "===== Lucky 防火墙状态 ====="
 echo "IPv4/6 规则:"
