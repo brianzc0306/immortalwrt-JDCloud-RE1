@@ -21,16 +21,9 @@ git clone https://github.com/gdy666/luci-app-lucky.git package/lucky
 # 拉取最新 nikki 包
 git clone -b main https://github.com/nikkinikki-org/OpenWrt-nikki.git package/nikki
 
-# 添加 BBR 优化脚本
-cat << 'EOF' >> package/base-files/files/etc/init.d/bbr
-#!/bin/sh /etc/rc.common
-START=99
-
-start() {
-    logger -t bbr "Enabling TCP BBR..."
-    sysctl -w net.core.default_qdisc=fq
-    sysctl -w net.ipv4.tcp_congestion_control=bbr
-}
+# 添加 BBR 优化 sysctl 配置文件
+mkdir -p package/base-files/files/etc/sysctl.d
+cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 EOF
-
-chmod +x package/base-files/files/etc/init.d/bbr
