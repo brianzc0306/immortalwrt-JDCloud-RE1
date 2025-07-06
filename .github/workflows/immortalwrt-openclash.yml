@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: immortalwrt-nikki
+name: immortalwrt-openclash
 
 on:
   repository_dispatch:
