@@ -24,6 +24,12 @@ git clone -b main https://github.com/nikkinikki-org/OpenWrt-nikki.git package/ni
 # 添加 BBR 优化 sysctl 配置文件
 mkdir -p package/base-files/files/etc/sysctl.d
 cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
+# BBR 核心参数
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
+
+# 优化参数（可选但推荐）
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
 EOF
