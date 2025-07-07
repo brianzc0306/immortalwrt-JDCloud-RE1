@@ -27,7 +27,6 @@ cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
 # BBR 核心参数
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
-
 # 优化参数（可选但推荐）
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_window_scaling = 1
