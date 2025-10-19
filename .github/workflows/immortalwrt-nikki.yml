@@ -1,13 +1,11 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
+# File: .github/workflows/openwrt-builder.yml
 # Description: Build OpenWrt using GitHub Actions
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
+# Copyright (c) 2019-2024 P3TERX
+# Licensed under the MIT License
 #
 
 name: immortalwrt-nikki
@@ -93,6 +91,75 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
+    # 🧩 添加 overlay 自动初始化脚本
+    - name: Add overlay auto-setup script
+      run: |
+        mkdir -p openwrt/files/root
+        mkdir -p openwrt/files/etc/init.d
+        mkdir -p openwrt/files/etc/rc.d
+
+        cat > openwrt/files/root/overlay.sh <<'EOF'
+        #!/bin/sh
+        DEVICE="/dev/mmcblk0p27"
+        MNT_DIR="/mnt/overlay_tmp"
+
+        echo "[1] 卸载分区..."
+        umount $DEVICE 2>/dev/null
+
+        echo "[2] 格式化分区为 ext4..."
+        mkfs.ext4 -F $DEVICE || exit 1
+
+        echo "[3] 临时挂载分区..."
+        mkdir -p $MNT_DIR
+        mount $DEVICE $MNT_DIR || exit 1
+
+        echo "[4] 拷贝现有 overlay 数据..."
+        cp -a /overlay/* $MNT_DIR/
+
+        echo "[5] 获取 UUID..."
+        UUID=$(block info $DEVICE | sed -n 's/.*UUID="\([^"]*\)".*/\1/p')
+        echo "分区 UUID: $UUID"
+
+        echo "[6] 配置 fstab..."
+        uci -q delete fstab.overlay
+        uci set fstab.overlay=mount
+        uci set fstab.overlay.target='/overlay'
+        uci set fstab.overlay.uuid="$UUID"
+        uci set fstab.overlay.enabled='1'
+
+        uci set fstab.@global[0].anon_swap='0'
+        uci set fstab.@global[0].anon_mount='1'
+        uci set fstab.@global[0].auto_swap='1'
+        uci set fstab.@global[0].auto_mount='1'
+        uci set fstab.@global[0].delay_root='5'
+        uci set fstab.@global[0].check_fs='0'
+
+        uci commit fstab
+
+        echo "[7] 卸载临时挂载..."
+        umount $MNT_DIR
+        rmdir $MNT_DIR
+
+        touch /etc/overlay_setup_done
+        echo ">>> Overlay 初始化完成，请重启系统 <<<"
+        EOF
+
+        # 自动开机执行一次
+        cat > openwrt/files/etc/init.d/overlay_autosetup <<'EOF'
+        #!/bin/sh /etc/rc.common
+        START=99
+        boot() {
+            [ -f /etc/overlay_setup_done ] && exit 0
+            echo "[AutoSetup] 首次启动，执行 overlay.sh ..."
+            /root/overlay.sh
+            reboot
+        }
+        EOF
+
+        chmod +x openwrt/files/root/overlay.sh
+        chmod +x openwrt/files/etc/init.d/overlay_autosetup
+        ln -sf /etc/init.d/overlay_autosetup openwrt/files/etc/rc.d/S99overlay_autosetup
+
     - name: Compile the firmware
       id: compile
       run: |
@@ -148,7 +215,7 @@ jobs:
       with:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        文件: ${{ env.FIRMWARE }}/*
 
     - name: Delete workflow runs
       uses: Mattraks/delete-workflow-runs@main
