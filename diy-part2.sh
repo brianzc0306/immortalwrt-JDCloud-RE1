@@ -72,3 +72,56 @@ net.ipv4.conf.default.accept_source_route = 0
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 EOF
+
+# RE-CS-07 / IPQ60xx 无 Wi-Fi，禁用全部 hostapd / wpad / supplicant 相关包
+if [ -f .config ]; then
+  for pkg in \
+    wpad \
+    wpad-basic \
+    wpad-basic-mbedtls \
+    wpad-basic-openssl \
+    wpad-basic-wolfssl \
+    wpad-mbedtls \
+    wpad-openssl \
+    wpad-wolfssl \
+    wpad-mini \
+    wpad-mesh \
+    wpad-mesh-openssl \
+    wpad-mesh-wolfssl \
+    hostapd \
+    hostapd-basic \
+    hostapd-basic-mbedtls \
+    hostapd-basic-openssl \
+    hostapd-basic-wolfssl \
+    hostapd-mbedtls \
+    hostapd-openssl \
+    hostapd-wolfssl \
+    hostapd-mini \
+    hostapd-common \
+    hostapd-utils \
+    wpa-supplicant \
+    wpa-supplicant-basic \
+    wpa-supplicant-mini \
+    wpa-supplicant-mbedtls \
+    wpa-supplicant-openssl \
+    wpa-supplicant-wolfssl \
+    wpa-supplicant-p2p \
+    wpa-supplicant-mesh-openssl \
+    wpa-supplicant-mesh-wolfssl \
+    wpa-cli \
+    eapol-test \
+    eapol-test-openssl \
+    eapol-test-wolfssl \
+    wireless-regdb
+  do
+    sed -i "/^CONFIG_PACKAGE_${pkg}=y/d" .config
+    sed -i "/^CONFIG_PACKAGE_${pkg}=m/d" .config
+    sed -i "/^# CONFIG_PACKAGE_${pkg} is not set/d" .config
+    echo "# CONFIG_PACKAGE_${pkg} is not set" >> .config
+  done
+
+  echo "===== Wireless packages disabled for RE-CS-07 ====="
+  grep -nE "CONFIG_PACKAGE_(wpad|hostapd|wpa-supplicant|wpa-cli|eapol-test|wireless-regdb)" .config || true
+else
+  echo "WARNING: .config not found, skip disabling wireless packages"
+fi
