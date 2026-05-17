@@ -29,7 +29,7 @@ mkdir -p package/network/services/hostapd/patches
 cat << 'EOF' > package/network/services/hostapd/patches/999-fix-he-mu-edca-csa.patch
 --- a/src/ap/hostapd.c
 +++ b/src/ap/hostapd.c
-@@ -4745,3 +4745,5 @@
+@@ -4750,1 +4750,3 @@
 -         hapd->iface->conf->he_mu_edca.he_qos_info &= 0xfff0;
 +#ifdef CONFIG_IEEE80211AX
 +         hapd->iface->conf->he_mu_edca.he_qos_info &= 0xfff0;
