@@ -149,7 +149,7 @@ if [ -f .config ]; then
     disable_package "$pkg"
   done
 
-# 关闭当前网络不使用的 NSS 模块
+# 关闭不使用的 NSS 隧道、加密及进阶管理模块（已保留 IPTV 组播加速）
 for mod in \
   nss-eip-firmware \
   kmod-qca-nss-crypto \
@@ -162,7 +162,6 @@ for mod in \
   kmod-qca-nss-drv-l2tpv2 \
   kmod-qca-nss-drv-tun6rd \
   kmod-qca-nss-drv-tunipip6 \
-  kmod-qca-nss-drv-igs \
   kmod-qca-nss-drv-lag-mgr \
   kmod-qca-nss-drv-mirror \
   kmod-qca-nss-drv-qdisc
