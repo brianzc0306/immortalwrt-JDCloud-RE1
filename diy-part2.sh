@@ -32,30 +32,10 @@ git clone --depth=1 -b main \
   package/nikki
 
 # 上网时间控制
-TIMECONTROL_TMP="$(mktemp -d /tmp/luci-app-timecontrol.XXXXXX)"
-
-cleanup() {
-  rm -rf "$TIMECONTROL_TMP"
-}
-trap cleanup EXIT
-
-rm -rf package/luci-app-timecontrol
-
+rm -rf package/timecontrol
 git clone --depth=1 \
   https://github.com/sirpdboy/luci-app-timecontrol.git \
-  "$TIMECONTROL_TMP"
-
-if [ ! -f "$TIMECONTROL_TMP/luci-app-timecontrol/Makefile" ]; then
-  echo "ERROR: luci-app-timecontrol Makefile not found"
-  exit 1
-fi
-
-cp -a \
-  "$TIMECONTROL_TMP/luci-app-timecontrol" \
-  package/luci-app-timecontrol
-
-echo "===== luci-app-timecontrol added ====="
-
+  package/timecontrol
 
 # ============================================================
 # BBR 与网络参数优化
