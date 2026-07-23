@@ -31,12 +31,6 @@ git clone --depth=1 -b main \
   https://github.com/nikkinikki-org/OpenWrt-nikki.git \
   package/nikki
 
-# 上网时间控制
-rm -rf package/timecontrol
-git clone --depth=1 \
-  https://github.com/sirpdboy/luci-app-timecontrol.git \
-  package/timecontrol
-
 # ============================================================
 # BBR 与网络参数优化
 # ============================================================
