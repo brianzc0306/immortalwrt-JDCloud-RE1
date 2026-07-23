@@ -149,20 +149,26 @@ if [ -f .config ]; then
     disable_package "$pkg"
   done
 
-  # 关闭不用的 NSS 隧道模块
-  for mod in \
-    kmod-qca-nss-drv-gre \
-    kmod-qca-nss-drv-eogremgr \
-    kmod-qca-nss-drv-map-t \
-    kmod-qca-nss-drv-vxlanmgr \
-    kmod-qca-nss-drv-wifi-meshmgr \
-    kmod-qca-nss-drv-pptp \
-    kmod-qca-nss-drv-l2tpv2 \
-    kmod-qca-nss-drv-tun6rd \
-    kmod-qca-nss-drv-tunipip6
-  do
-    disable_package "$mod"
-  done
+# 关闭当前网络不使用的 NSS 模块
+for mod in \
+  nss-eip-firmware \
+  kmod-qca-nss-crypto \
+  kmod-qca-nss-drv-gre \
+  kmod-qca-nss-drv-eogremgr \
+  kmod-qca-nss-drv-map-t \
+  kmod-qca-nss-drv-vxlanmgr \
+  kmod-qca-nss-drv-wifi-meshmgr \
+  kmod-qca-nss-drv-pptp \
+  kmod-qca-nss-drv-l2tpv2 \
+  kmod-qca-nss-drv-tun6rd \
+  kmod-qca-nss-drv-tunipip6 \
+  kmod-qca-nss-drv-igs \
+  kmod-qca-nss-drv-lag-mgr \
+  kmod-qca-nss-drv-mirror \
+  kmod-qca-nss-drv-qdisc
+do
+  disable_package "$mod"
+done
 
   echo "===== Wireless packages disabled ====="
   echo "===== Unnecessary NSS tunnel modules disabled ====="
