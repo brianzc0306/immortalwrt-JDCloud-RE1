@@ -10,21 +10,57 @@
 # See /LICENSE for more information.
 
 # Modify default IP
-sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.1.1/192.168.0.1/g' \
+  package/base-files/files/bin/config_generate
 
 # Modify default theme
-#sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
+#sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' \
+#  feeds/luci/collections/luci/Makefile
 
 # Pull latest lucky package
 rm -rf package/lucky
-git clone --depth=1 https://github.com/gdy666/luci-app-lucky.git package/lucky
+git clone --depth=1 \
+  https://github.com/gdy666/luci-app-lucky.git \
+  package/lucky
 
 # Pull latest nikki package
 rm -rf package/nikki
-git clone --depth=1 -b main https://github.com/nikkinikki-org/OpenWrt-nikki.git package/nikki
+git clone --depth=1 -b main \
+  https://github.com/nikkinikki-org/OpenWrt-nikki.git \
+  package/nikki
+
+# Pull latest luci-app-timecontrol package
+# The actual OpenWrt package is inside the repository's
+# luci-app-timecontrol subdirectory.
+TIMECONTROL_TMP="/tmp/luci-app-timecontrol-src"
+
+rm -rf "$TIMECONTROL_TMP"
+rm -rf package/luci-app-timecontrol
+
+if ! git clone --depth=1 \
+  https://github.com/sirpdboy/luci-app-timecontrol.git \
+  "$TIMECONTROL_TMP"; then
+  echo "ERROR: Failed to clone luci-app-timecontrol"
+  exit 1
+fi
+
+if [ ! -f "$TIMECONTROL_TMP/luci-app-timecontrol/Makefile" ]; then
+  echo "ERROR: luci-app-timecontrol Makefile not found"
+  rm -rf "$TIMECONTROL_TMP"
+  exit 1
+fi
+
+cp -a \
+  "$TIMECONTROL_TMP/luci-app-timecontrol" \
+  package/luci-app-timecontrol
+
+rm -rf "$TIMECONTROL_TMP"
+
+echo "===== luci-app-timecontrol added ====="
 
 # Add BBR/sysctl tuning for RE-CS-07
 mkdir -p package/base-files/files/etc/sysctl.d
+
 cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
 ########## BBR congestion control ##########
 net.core.default_qdisc = fq
@@ -74,7 +110,8 @@ EOF
 
 # RE-CS-07 / IPQ60xx has no Wi-Fi.
 # Disable hostapd / wpad / supplicant packages.
-# Disable only clearly unused NSS tunnel modules; keep core NSS and TProxy.
+# Disable only clearly unused NSS tunnel modules;
+# keep core NSS and TProxy.
 if [ -f .config ]; then
   # Disable wireless userspace packages
   for pkg in \
