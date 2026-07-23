@@ -1,52 +1,52 @@
 #!/bin/bash
 #
-# https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part2.sh
-# Description: OpenWrt DIY script part 2 (After Update feeds)
+# Description: After Update feeds
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
 
-# Modify default IP
+set -euo pipefail
+
+# 修改默认 LAN 地址
 sed -i 's/192.168.1.1/192.168.0.1/g' \
   package/base-files/files/bin/config_generate
 
-# Modify default theme
-#sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' \
-#  feeds/luci/collections/luci/Makefile
+# 修改默认主题
+# sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' \
+#   feeds/luci/collections/luci/Makefile
 
-# Pull latest lucky package
+
+# ============================================================
+# 拉取第三方插件
+# ============================================================
+
+# Lucky
 rm -rf package/lucky
 git clone --depth=1 \
   https://github.com/gdy666/luci-app-lucky.git \
   package/lucky
 
-# Pull latest nikki package
+# Nikki
 rm -rf package/nikki
 git clone --depth=1 -b main \
   https://github.com/nikkinikki-org/OpenWrt-nikki.git \
   package/nikki
 
-# Pull latest luci-app-timecontrol package
-# The actual OpenWrt package is inside the repository's
-# luci-app-timecontrol subdirectory.
-TIMECONTROL_TMP="/tmp/luci-app-timecontrol-src"
+# 上网时间控制
+TIMECONTROL_TMP="$(mktemp -d /tmp/luci-app-timecontrol.XXXXXX)"
 
-rm -rf "$TIMECONTROL_TMP"
+cleanup() {
+  rm -rf "$TIMECONTROL_TMP"
+}
+trap cleanup EXIT
+
 rm -rf package/luci-app-timecontrol
 
-if ! git clone --depth=1 \
+git clone --depth=1 \
   https://github.com/sirpdboy/luci-app-timecontrol.git \
-  "$TIMECONTROL_TMP"; then
-  echo "ERROR: Failed to clone luci-app-timecontrol"
-  exit 1
-fi
+  "$TIMECONTROL_TMP"
 
 if [ ! -f "$TIMECONTROL_TMP/luci-app-timecontrol/Makefile" ]; then
   echo "ERROR: luci-app-timecontrol Makefile not found"
-  rm -rf "$TIMECONTROL_TMP"
   exit 1
 fi
 
@@ -54,11 +54,13 @@ cp -a \
   "$TIMECONTROL_TMP/luci-app-timecontrol" \
   package/luci-app-timecontrol
 
-rm -rf "$TIMECONTROL_TMP"
-
 echo "===== luci-app-timecontrol added ====="
 
-# Add BBR/sysctl tuning for RE-CS-07
+
+# ============================================================
+# BBR 与网络参数优化
+# ============================================================
+
 mkdir -p package/base-files/files/etc/sysctl.d
 
 cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
@@ -71,7 +73,6 @@ net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_sack = 1
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_no_metrics_save = 1
 net.ipv4.tcp_mtu_probing = 1
 
 ########## Buffer tuning for 2GB RAM ##########
@@ -82,20 +83,18 @@ net.ipv4.tcp_rmem = 4096 87380 8388608
 net.ipv4.tcp_wmem = 4096 65536 8388608
 
 ########## Throughput and latency ##########
-net.core.netdev_max_backlog = 250000
+net.core.netdev_max_backlog = 32768
 net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_rfc1337 = 1
 
 ########## NAT and conntrack ##########
 net.netfilter.nf_conntrack_max = 262144
-net.netfilter.nf_conntrack_tcp_timeout_established = 1800
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120
 
 ########## IPv6 baseline ##########
-net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.default.use_tempaddr = 0
 net.ipv6.conf.all.use_tempaddr = 0
 
@@ -104,16 +103,30 @@ net.ipv4.icmp_echo_ignore_broadcasts = 1
 net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.accept_source_route = 0
 net.ipv4.conf.default.accept_source_route = 0
+
+########## Policy routing / Nikki TUN ##########
 net.ipv4.conf.all.rp_filter = 0
 net.ipv4.conf.default.rp_filter = 0
 EOF
 
-# RE-CS-07 / IPQ60xx has no Wi-Fi.
-# Disable hostapd / wpad / supplicant packages.
-# Disable only clearly unused NSS tunnel modules;
-# keep core NSS and TProxy.
+
+# ============================================================
+# 精简无线组件和 NSS 隧道模块
+# ============================================================
+
+disable_package() {
+  local package_name="$1"
+
+  sed -i "/^CONFIG_PACKAGE_${package_name}=y/d" .config
+  sed -i "/^CONFIG_PACKAGE_${package_name}=m/d" .config
+  sed -i "/^# CONFIG_PACKAGE_${package_name} is not set/d" .config
+
+  echo "# CONFIG_PACKAGE_${package_name} is not set" >> .config
+}
+
 if [ -f .config ]; then
-  # Disable wireless userspace packages
+
+  # RE-CS-07 无无线功能
   for pkg in \
     wpad \
     wpad-basic \
@@ -153,13 +166,10 @@ if [ -f .config ]; then
     eapol-test-wolfssl \
     wireless-regdb
   do
-    sed -i "/^CONFIG_PACKAGE_${pkg}=y/d" .config
-    sed -i "/^CONFIG_PACKAGE_${pkg}=m/d" .config
-    sed -i "/^# CONFIG_PACKAGE_${pkg} is not set/d" .config
-    echo "# CONFIG_PACKAGE_${pkg} is not set" >> .config
+    disable_package "$pkg"
   done
 
-  # Disable unused NSS tunnel acceleration modules
+  # 关闭不用的 NSS 隧道模块
   for mod in \
     kmod-qca-nss-drv-gre \
     kmod-qca-nss-drv-eogremgr \
@@ -171,15 +181,14 @@ if [ -f .config ]; then
     kmod-qca-nss-drv-tun6rd \
     kmod-qca-nss-drv-tunipip6
   do
-    sed -i "/^CONFIG_PACKAGE_${mod}=y/d" .config
-    sed -i "/^CONFIG_PACKAGE_${mod}=m/d" .config
-    sed -i "/^# CONFIG_PACKAGE_${mod} is not set/d" .config
-    echo "# CONFIG_PACKAGE_${mod} is not set" >> .config
+    disable_package "$mod"
   done
 
   echo "===== Wireless packages disabled ====="
   echo "===== Unnecessary NSS tunnel modules disabled ====="
-  echo "===== Core NSS + TProxy kept ====="
+  echo "===== Core NSS + ECM + TProxy kept ====="
+
 else
-  echo "WARNING: .config not found, skip package adjustment"
+  echo "ERROR: .config not found"
+  exit 1
 fi
