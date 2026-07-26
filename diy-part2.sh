@@ -60,6 +60,12 @@ cat << 'EOF' > package/base-files/files/etc/sysctl.d/99-bbr.conf
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 
+########## Socket buffers for high-BDP links ##########
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
 ########## TCP tuning ##########
 net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_sack = 1

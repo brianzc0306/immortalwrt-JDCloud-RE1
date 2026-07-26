@@ -11,7 +11,7 @@
 - 默认管理地址：`192.168.0.1`
 - 默认界面：简体中文 LuCI + Argon 主题
 - 主要插件：Nikki、Lucky、msd_lite、UPnP
-- 网络优化：BBR、NSS/ECM、动态 Conntrack 上限与 TProxy 兼容策略
+- 网络优化：BBR、TCP buffer 调优、NSS/ECM、动态 Conntrack 上限与 TProxy 兼容策略
 
 > RE-CS-07 本身不提供 Wi-Fi。本仓库会在构建时禁用无线用户态组件和明确不需要的 NSS 隧道模块。
 
