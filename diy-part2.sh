@@ -50,9 +50,9 @@ git clone --depth=1 -b main \
   package/nikki
 
 # Optional OpenAppFilter test build. Stable builds do not fetch or select OAF.
-BUILD_VARIANT="${BUILD_VARIANT:-stable}"
+FIRMWARE_FLAVOR="${FIRMWARE_FLAVOR:-stable}"
 
-case "$BUILD_VARIANT" in
+case "$FIRMWARE_FLAVOR" in
   stable)
     ;;
   oaf-test)
@@ -105,7 +105,7 @@ case "$BUILD_VARIANT" in
     echo 'CONFIG_PACKAGE_luci-app-oaf=y' >> .config
     ;;
   *)
-    echo "ERROR: unsupported build variant: $BUILD_VARIANT"
+    echo "ERROR: unsupported build variant: $FIRMWARE_FLAVOR"
     exit 1
     ;;
 esac

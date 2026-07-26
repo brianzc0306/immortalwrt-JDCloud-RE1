@@ -29,7 +29,7 @@ env:
   REPO_BRANCH: main
   CONFIG_FILE: nikki.config
   DIY_P2_SH: diy-part2.sh
-  BUILD_VARIANT: ${{ github.event.inputs.build_variant || 'stable' }}
+  FIRMWARE_FLAVOR: ${{ github.event.inputs.build_variant || 'stable' }}
   OAF_REPO_URL: https://github.com/destan19/OpenAppFilter.git
   OAF_COMMIT: a189ad85e8fb461318533941963f0e2975274a19
   UPLOAD_BIN_DIR: false
@@ -175,7 +175,7 @@ jobs:
           mv "$CONFIG_FILE" openwrt/.config
           chmod +x "$DIY_P2_SH"
           cd openwrt
-          echo "Build variant: $BUILD_VARIANT"
+          echo "Build variant: $FIRMWARE_FLAVOR"
           "$GITHUB_WORKSPACE/$DIY_P2_SH"
 
       - name: Download packages
@@ -199,7 +199,7 @@ jobs:
             echo "$required_config"
           done
 
-          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+          if [ "$FIRMWARE_FLAVOR" = "oaf-test" ]; then
             echo "===== Required OAF test packages ====="
             for required_config in \
               CONFIG_PACKAGE_luci-app-oaf=y \
@@ -338,7 +338,7 @@ jobs:
           steps.organize.outputs.status == 'success' &&
           env.UPLOAD_RELEASE == 'true'
         run: |
-          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+          if [ "$FIRMWARE_FLAVOR" = "oaf-test" ]; then
             RELEASE_TAG="immortalwrt-oaf-test-$(date '+%Y.%m.%d-%H%M')"
             RELEASE_TITLE="ImmortalWrt OAF 测试固件"
             RELEASE_PLUGINS="Nikki、Lucky、OpenAppFilter（OAF）"
@@ -359,11 +359,11 @@ jobs:
             echo "- 设备：JDCloud RE-CS-07"
             echo "- 源码：VIKINGYFY/immortalwrt"
             echo "- 分支：$REPO_BRANCH"
-            echo "- 构建类型：$BUILD_VARIANT"
+            echo "- 构建类型：$FIRMWARE_FLAVOR"
             echo "- 编译时间：$(date '+%Y-%m-%d %H:%M:%S %Z')"
             echo "- 默认地址：192.168.0.1"
             echo "- 插件：$RELEASE_PLUGINS"
-            if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+            if [ "$FIRMWARE_FLAVOR" = "oaf-test" ]; then
               echo "- OAF 默认状态：已安装但未启用，未预设设备或拦截规则"
               echo "- 加速默认状态：保留 NSS/ECM，软件及硬件 Flow Offloading 关闭"
               echo
@@ -430,7 +430,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+          if [ "$FIRMWARE_FLAVOR" = "oaf-test" ]; then
             RELEASE_PREFIX="immortalwrt-oaf-test-"
           else
             RELEASE_PREFIX="immortalwrt-nikki-"
