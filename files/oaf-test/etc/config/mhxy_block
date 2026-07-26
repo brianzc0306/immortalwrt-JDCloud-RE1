@@ -1,3 +1,0 @@
-config global 'main'
-	option enabled '0'
-	option device_ip ''

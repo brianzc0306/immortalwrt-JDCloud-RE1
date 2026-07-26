@@ -365,7 +365,6 @@ jobs:
             echo "- 插件：$RELEASE_PLUGINS"
             if [ "$FIRMWARE_FLAVOR" = "oaf-test" ]; then
               echo "- OAF 默认状态：已安装但未启用"
-              echo "- 梦幻西游拦截测试：已安装、默认关闭，目标地址默认不填写，启用前需在页面填入目标设备固定 IPv4"
               echo "- 运行兼容性：不停止 Nikki，不修改 HNAT/ECM 或 Flow Offloading 设置"
               echo "- 加速默认状态：保留 NSS/ECM，软件及硬件 Flow Offloading 关闭"
               echo
