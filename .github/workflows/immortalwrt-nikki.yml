@@ -202,11 +202,6 @@ jobs:
           echo "===== Selected target ====="
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config || true
 
-          echo "===== Timecontrol packages ====="
-          grep -E \
-            '^CONFIG_PACKAGE_(luci-app-timecontrol|luci-i18n-timecontrol-zh-cn|bash|bc|conntrack|nftables)=y' \
-            .config || true
-
           make download -j8
 
           find dl -size -1024c -exec ls -l {} \;
@@ -305,7 +300,6 @@ jobs:
             echo "- 分支：$REPO_BRANCH"
             echo "- 编译时间：$(date '+%Y-%m-%d %H:%M:%S %Z')"
             echo "- Nikki：已包含"
-            echo "- Timecontrol：已包含"
           } > release.txt
 
           echo "status=success" >> "$GITHUB_OUTPUT"
