@@ -26,7 +26,7 @@
 
 ## RE-CS-07 运行策略
 
-- Conntrack 默认上限为 `131072`；实际连接数达到该值的 75% 时，本次开机自动提升到 `262144`，重启后重新从低档观察，避免长期无条件放大连接表。
+- Conntrack 默认上限为 `131072`；实际连接数达到该值的 75% 时，本次开机自动提升到 `262144`，重启后重新从低档观察，避免长期无条件放大连接表。TCP established 超时从内核默认的 7440 秒收紧到 3600 秒，减少死连接白占表项；监控进程同时盯 `insert_failed`/`drop` 计数，连接表真打满丢包时会在日志中记录。
 - 保留构建源默认提供的 NSS 核心与 ECM，并由构建流程确认 `kmod-qca-nss-drv`、`kmod-qca-nss-ecm` 和 Nikki 所需的 `kmod-nft-tproxy` 均已选中。
 - 默认关闭防火墙软件及硬件 Flow Offloading，避免与 NSS/ECM、Nikki 的 nftables 标记和 TProxy 路径重复加速。
 - Nikki 核心日志级别为 `warning`，应用日志和核心日志各以 1 MB 为清理阈值；日志位于 RAM 支撑的 `/var/log`。Lucky 使用有上限的内存日志，并关闭重复的 init 启停消息。

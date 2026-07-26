@@ -4,6 +4,7 @@
 
 CONNTRACK_COUNT=/proc/sys/net/netfilter/nf_conntrack_count
 CONNTRACK_MAX=/proc/sys/net/netfilter/nf_conntrack_max
+CONNTRACK_STAT=/proc/net/stat/nf_conntrack
 
 is_uint() {
 	case "$1" in
@@ -69,6 +70,34 @@ adjust_conntrack() {
 	fi
 }
 
+# 汇总全部 CPU 的 insert_failed 与 drop 计数（第 10、11 列，十六进制）。
+# 这两个计数只在连接表插不进新条目时增长，是"表真打满丢包"的直接证据。
+conntrack_failures() {
+	[ -r "$CONNTRACK_STAT" ] || return 1
+
+	local failed=0 dropped=0 f d
+	while read -r _ _ _ _ _ _ _ _ _ f d _; do
+		case "$f" in ''|*[!0-9a-f]*) continue ;; esac
+		case "$d" in ''|*[!0-9a-f]*) continue ;; esac
+		failed=$((failed + 0x$f))
+		dropped=$((dropped + 0x$d))
+	done < "$CONNTRACK_STAT"
+
+	printf '%s/%s\n' "$failed" "$dropped"
+}
+
+# 计数单调递增（重启清零），只在数值变化时记录一次，不刷屏。
+monitor_conntrack_failures() {
+	local current
+	current="$(conntrack_failures)" || return 0
+
+	if [ -n "$failure_state" ] && [ "$current" != "$failure_state" ]; then
+		logger -t re-cs-07-monitor -p daemon.warn \
+			"conntrack insert_failed/drop changed: $failure_state -> $current; table may be full"
+	fi
+	failure_state="$current"
+}
+
 max_temperature() {
 	local path value maximum found
 	maximum=0
@@ -115,10 +144,12 @@ main() {
 	[ "$enabled" = 1 ] || exit 0
 
 	temperature_state=normal
+	failure_state=""
 	prepare_conntrack
 
 	while :; do
 		adjust_conntrack
+		monitor_conntrack_failures
 		monitor_temperature
 		sleep "$interval"
 	done

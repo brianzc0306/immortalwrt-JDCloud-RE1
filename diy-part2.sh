@@ -75,6 +75,8 @@ net.ipv4.tcp_rfc1337 = 1
 ########## NAT and adaptive conntrack baseline ##########
 # The runtime monitor raises this to 262144 at 75% actual usage.
 net.netfilter.nf_conntrack_max = 131072
+# Established entries default to 7440s; dead sessions waste table space.
+net.netfilter.nf_conntrack_tcp_timeout_established = 3600
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120
