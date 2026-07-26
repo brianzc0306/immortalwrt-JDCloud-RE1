@@ -49,6 +49,10 @@ start_service() {
 
 	[ "$enabled" -eq 1 ] || return 0
 
+	if [ -z "$device_ip" ]; then
+		return 0
+	fi
+
 	if ! valid_ipv4 "$device_ip"; then
 		logger -t mhxy-block "invalid target IPv4 address: $device_ip"
 		return 1

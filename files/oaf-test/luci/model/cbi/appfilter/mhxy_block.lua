@@ -15,14 +15,19 @@ enabled.rmempty = false
 
 local device_ip = s:option(Value, "device_ip", translate("目标设备 IPv4"))
 device_ip.datatype = "ip4addr"
-device_ip.rmempty = false
-device_ip.placeholder = "192.168.0.215"
-device_ip.description = translate("请先在 DHCP 中为设备绑定固定地址。启用或修改后，请彻底退出并重新启动游戏，以建立受新规则控制的连接。")
+device_ip.rmempty = true
+device_ip.placeholder = ""
+device_ip.description = translate("默认不填写。仅在需要拦截时填入目标设备的固定 IPv4 地址，页面可随时更换目标设备。请先在 DHCP 中为设备绑定固定地址。启用或修改后，请彻底退出并重新启动游戏，以建立受新规则控制的连接。")
 
 local state = s:option(DummyValue, "_state", translate("运行状态"))
 function state.cfgvalue()
 	if sys.call("nft list table inet mhxy_block >/dev/null 2>&1") == 0 then
 		return translate("已启用")
+	end
+
+	local ip = sys.exec("uci -q get mhxy_block.main.device_ip 2>/dev/null"):gsub("%s+$", "")
+	if ip == "" then
+		return translate("已关闭（未填写目标设备）")
 	end
 
 	return translate("已关闭")
