@@ -49,68 +49,6 @@ git clone --depth=1 -b main \
   https://github.com/nikkinikki-org/OpenWrt-nikki.git \
   package/nikki
 
-# Optional OpenAppFilter test build. Stable builds do not fetch or select OAF.
-FIRMWARE_FLAVOR="${FIRMWARE_FLAVOR:-stable}"
-
-case "$FIRMWARE_FLAVOR" in
-  stable)
-    ;;
-  oaf-test)
-    OAF_REPO_URL="${OAF_REPO_URL:-https://github.com/destan19/OpenAppFilter.git}"
-    OAF_COMMIT="${OAF_COMMIT:-a189ad85e8fb461318533941963f0e2975274a19}"
-
-    # ImmortalWrt's packages feed also provides open-app-filter. Keeping that
-    # package together with the pinned upstream tree creates duplicate
-    # appfilter/kmod-oaf definitions and a Kconfig self-dependency.
-    for duplicate_oaf_path in \
-      package/feeds/packages/open-app-filter \
-      feeds/packages/net/open-app-filter
-    do
-      if [ -e "$duplicate_oaf_path" ] || [ -L "$duplicate_oaf_path" ]; then
-        echo "Removing duplicate feed package: $duplicate_oaf_path"
-        rm -rf -- "$duplicate_oaf_path"
-      fi
-
-      if [ -e "$duplicate_oaf_path" ] || [ -L "$duplicate_oaf_path" ]; then
-        echo "ERROR: duplicate OpenAppFilter feed package still exists: $duplicate_oaf_path"
-        exit 1
-      fi
-    done
-
-    rm -rf package/OpenAppFilter
-    git init package/OpenAppFilter
-    git -C package/OpenAppFilter remote add origin "$OAF_REPO_URL"
-    git -C package/OpenAppFilter fetch --depth=1 origin "$OAF_COMMIT"
-    git -C package/OpenAppFilter checkout --detach FETCH_HEAD
-
-    if [ "$(git -C package/OpenAppFilter rev-parse HEAD)" != "$OAF_COMMIT" ]; then
-      echo "ERROR: OpenAppFilter checkout does not match pinned commit"
-      exit 1
-    fi
-
-    if ! grep -Fq '2006 梦幻西游:' \
-      package/OpenAppFilter/open-app-filter/files/feature.cfg; then
-      echo "ERROR: pinned OpenAppFilter feature library lacks 梦幻西游 (ID 2006)"
-      exit 1
-    fi
-
-    if ! grep -Fq "option enable '0'" \
-      package/OpenAppFilter/open-app-filter/files/appfilter.config || \
-       ! grep -Fq "option disable_hnat '0'" \
-      package/OpenAppFilter/open-app-filter/files/appfilter.config; then
-      echo "ERROR: unexpected OpenAppFilter safe defaults"
-      exit 1
-    fi
-
-
-    echo 'CONFIG_PACKAGE_luci-app-oaf=y' >> .config
-    ;;
-  *)
-    echo "ERROR: unsupported build variant: $FIRMWARE_FLAVOR"
-    exit 1
-    ;;
-esac
-
 # ============================================================
 # BBR 与网络参数优化
 # ============================================================

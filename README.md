@@ -20,26 +20,9 @@
 1. 打开仓库的 **Actions** 页面。
 2. 选择 **immortalwrt-nikki**。
 3. 点击 **Run workflow**。
-4. 在 **Build variant** 中选择构建类型：
-   - `stable`：现有稳定版，不包含 OAF。
-   - `oaf-test`：加入 OpenAppFilter 的测试版。
-5. 构建完成后，从对应 Release 或 Actions Artifact 下载固件。
+4. 构建完成后，从对应 Release 或 Actions Artifact 下载固件。
 
-同一分支、同一构建类型同时只运行一个构建。新构建启动时，会自动取消同类型仍在运行的旧构建，避免并发发布冲突。
-
-## OAF 测试版
-
-`oaf-test` 使用与固件完全相同的内核源码编译 `kmod-oaf`、`appfilter` 和 `luci-app-oaf`，不会安装来源不匹配的预编译内核模块。OAF 源码固定到提交 `a189ad85e8fb461318533941963f0e2975274a19`，该版本包含《梦幻西游》（应用 ID `2006`）识别规则和 Linux 6.18 所需的内核接口适配。
-
-- 测试版作为 GitHub **Pre-release** 发布，标签以 `immortalwrt-oaf-test-` 开头，避免与稳定版混淆。
-- 稳定版和测试版分别保留最近 3 个 Release，测试构建不会挤掉稳定版下载。
-- OAF 已安装但默认关闭，不会自动禁止任何设备或应用。
-- 默认继续保留 NSS/ECM，并保持软件及硬件 Flow Offloading 关闭。
-- 首次测试时，先在 DHCP 中为目标设备绑定固定地址，并在 Nikki 中让该设备直连，避免代理流量绕过 OAF 的识别路径。
-- 打开 LuCI 的 **服务 → App Filter**，只选择目标设备和《梦幻西游》，确认识别记录正常后再开启拦截。
-- 如果能够看到设备但始终识别不到游戏流量，可在 OAF 高级设置中临时停用硬件加速后复测；这会影响全局 NSS/ECM 加速，只应作为排查步骤。
-
-OAF 属于 DPI 特征识别，游戏更新、加密协议或代理路径变化都可能影响命中率，因此本测试版不替代按设备完全断网规则。刷写前请备份配置，建议首次测试不保留旧配置，测试完成后再决定是否合入稳定版。
+同一分支同时只运行一个构建。新构建启动时，会自动取消仍在运行的旧构建，避免并发发布冲突。仅保留最近 3 个 Release。
 
 ## RE-CS-07 运行策略
 
@@ -64,7 +47,7 @@ re-cs-07-status
 - `sha256sums`：所有发布文件的 SHA-256 校验值
 - `config.seed`：经过 `make defconfig` 处理的最终构建配置
 - `packages.manifest`：固件包含的软件包清单
-- `source-versions.txt`：ImmortalWrt、Lucky、Nikki，以及测试版 OAF 的源码提交
+- `source-versions.txt`：ImmortalWrt、Lucky 和 Nikki 的源码提交
 - `release.txt`：本次构建说明
 
 Linux/macOS 校验示例：
@@ -111,7 +94,6 @@ Get-FileHash .\固件文件名 -Algorithm SHA256
 - [VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
 - [nikkinikki-org/OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki)
 - [gdy666/luci-app-lucky](https://github.com/gdy666/luci-app-lucky)
-- [destan19/OpenAppFilter](https://github.com/destan19/OpenAppFilter)
 
 ## License
 
