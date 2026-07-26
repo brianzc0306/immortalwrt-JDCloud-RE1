@@ -11,7 +11,7 @@
 - 默认管理地址：`192.168.0.1`
 - 默认界面：简体中文 LuCI + Argon 主题
 - 主要插件：Nikki、Lucky、msd_lite、UPnP
-- 网络优化：BBR 与适用于 2 GB 内存设备的基础参数
+- 网络优化：BBR、NSS/ECM、动态 Conntrack 上限与 TProxy 兼容策略
 
 > RE-CS-07 本身不提供 Wi-Fi。本仓库会在构建时禁用无线用户态组件和明确不需要的 NSS 隧道模块。
 
@@ -23,6 +23,22 @@
 4. 构建完成后，从对应 Release 或 Actions Artifact 下载固件。
 
 同一分支同时只运行一个构建。新构建启动时，会自动取消仍在运行的旧构建，避免并发发布冲突。
+
+## RE-CS-07 运行策略
+
+- Conntrack 默认上限为 `131072`；实际连接数达到该值的 75% 时，本次开机自动提升到 `262144`，重启后重新从低档观察，避免长期无条件放大连接表。
+- 保留构建源默认提供的 NSS 核心与 ECM，并由构建流程确认 `kmod-qca-nss-drv`、`kmod-qca-nss-ecm` 和 Nikki 所需的 `kmod-nft-tproxy` 均已选中。
+- 默认关闭防火墙软件及硬件 Flow Offloading，避免与 NSS/ECM、Nikki 的 nftables 标记和 TProxy 路径重复加速。
+- Nikki 核心日志级别为 `warning`，应用日志和核心日志各以 1 MB 为清理阈值；日志位于 RAM 支撑的 `/var/log`。Lucky 使用有上限的内存日志，并关闭重复的 init 启停消息。
+- 不修改 CPU governor 或频率上下限，继续使用上游动态调频和内核热管理；温度达到 80°C、90°C 或降回 75°C 以下时才记录状态变化，避免周期性刷日志。
+
+通过 SSH 执行以下命令可查看 Conntrack、温度、CPU 动态频率、NSS/ECM 状态和 Flow Offloading 设置：
+
+```sh
+re-cs-07-status
+```
+
+高级用户可编辑 `/etc/config/re_cs_07` 调整监控间隔和阈值，然后执行 `/etc/init.d/re-cs-07-monitor restart`。
 
 ## 下载与校验
 
@@ -54,7 +70,7 @@ Get-FileHash .\固件文件名 -Algorithm SHA256
 - 构建后调整：编辑 [`diy-part2.sh`](diy-part2.sh)
 - Actions 流程：编辑 [`.github/workflows/immortalwrt-nikki.yml`](.github/workflows/immortalwrt-nikki.yml)
 
-`nikki.config` 只显式选择用户功能和顶层应用。其底层库、内核模块及服务由 OpenWrt 包依赖自动补齐，以降低配置维护成本。
+`nikki.config` 主要显式选择用户功能和顶层应用；NSS、ECM 与 TProxy 作为本机关键数据路径额外固定并在构建时校验。其余底层库、内核模块及服务由 OpenWrt 包依赖自动补齐。
 
 ## 注意事项
 
@@ -69,6 +85,7 @@ Get-FileHash .\固件文件名 -Algorithm SHA256
 | --- | --- |
 | `nikki.config` | 设备目标和顶层软件包配置 |
 | `diy-part2.sh` | 拉取第三方插件、设置默认地址及精简设备组件 |
+| `files/` | RE-CS-07 运行时监控、状态命令和首次启动策略 |
 | `.github/workflows/immortalwrt-nikki.yml` | 构建、校验、发布和清理流程 |
 
 ## 致谢

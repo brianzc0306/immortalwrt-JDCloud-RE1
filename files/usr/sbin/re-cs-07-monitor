@@ -1,0 +1,128 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+CONNTRACK_COUNT=/proc/sys/net/netfilter/nf_conntrack_count
+CONNTRACK_MAX=/proc/sys/net/netfilter/nf_conntrack_max
+
+is_uint() {
+	case "$1" in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
+}
+
+load_settings() {
+	config_load re_cs_07
+	config_get_bool enabled main enabled 1
+	config_get interval main interval 30
+	config_get_bool conntrack_auto main conntrack_auto 1
+	config_get conntrack_low main conntrack_low 131072
+	config_get conntrack_high main conntrack_high 262144
+	config_get conntrack_raise_percent main conntrack_raise_percent 75
+	config_get temperature_warn main temperature_warn 80000
+	config_get temperature_critical main temperature_critical 90000
+	config_get temperature_clear main temperature_clear 75000
+
+	is_uint "$interval" && [ "$interval" -ge 10 ] || interval=30
+	is_uint "$conntrack_low" || conntrack_low=131072
+	is_uint "$conntrack_high" || conntrack_high=262144
+	[ "$conntrack_high" -ge "$conntrack_low" ] || conntrack_high=262144
+	is_uint "$conntrack_raise_percent" && \
+		[ "$conntrack_raise_percent" -ge 1 ] && \
+		[ "$conntrack_raise_percent" -le 99 ] || conntrack_raise_percent=75
+	is_uint "$temperature_warn" || temperature_warn=80000
+	is_uint "$temperature_critical" || temperature_critical=90000
+	is_uint "$temperature_clear" || temperature_clear=75000
+	[ "$temperature_clear" -lt "$temperature_warn" ] || temperature_clear=75000
+	[ "$temperature_warn" -lt "$temperature_critical" ] || temperature_critical=90000
+}
+
+prepare_conntrack() {
+	[ "$conntrack_auto" = 1 ] || return 0
+	[ -r "$CONNTRACK_MAX" ] && [ -w "$CONNTRACK_MAX" ] || return 0
+
+	local current_max
+	current_max="$(cat "$CONNTRACK_MAX" 2>/dev/null)"
+	is_uint "$current_max" || return 0
+
+	if [ "$current_max" -lt "$conntrack_low" ]; then
+		printf '%s\n' "$conntrack_low" > "$CONNTRACK_MAX"
+	fi
+}
+
+adjust_conntrack() {
+	[ "$conntrack_auto" = 1 ] || return 0
+	[ -r "$CONNTRACK_COUNT" ] && [ -r "$CONNTRACK_MAX" ] && \
+		[ -w "$CONNTRACK_MAX" ] || return 0
+
+	local count current_max raise_at
+	count="$(cat "$CONNTRACK_COUNT" 2>/dev/null)"
+	current_max="$(cat "$CONNTRACK_MAX" 2>/dev/null)"
+	is_uint "$count" && is_uint "$current_max" || return 0
+
+	raise_at=$((conntrack_low * conntrack_raise_percent / 100))
+	if [ "$current_max" -lt "$conntrack_high" ] && [ "$count" -ge "$raise_at" ]; then
+		printf '%s\n' "$conntrack_high" > "$CONNTRACK_MAX"
+		logger -t re-cs-07-monitor -p daemon.notice \
+			"conntrack usage ${count}/${current_max}; raised limit to ${conntrack_high} until reboot"
+	fi
+}
+
+max_temperature() {
+	local path value maximum found
+	maximum=0
+	found=0
+
+	for path in /sys/class/thermal/thermal_zone*/temp; do
+		[ -r "$path" ] || continue
+		value="$(cat "$path" 2>/dev/null)"
+		is_uint "$value" || continue
+		[ "$value" -gt "$maximum" ] && maximum="$value"
+		found=1
+	done
+
+	[ "$found" = 1 ] || return 1
+	printf '%s\n' "$maximum"
+}
+
+monitor_temperature() {
+	local temperature
+	temperature="$(max_temperature)" || return 0
+
+	if [ "$temperature" -ge "$temperature_critical" ]; then
+		if [ "$temperature_state" != critical ]; then
+			logger -t re-cs-07-monitor -p daemon.crit \
+				"temperature reached $((temperature / 1000)) C; check ventilation"
+			temperature_state=critical
+		fi
+	elif [ "$temperature" -ge "$temperature_warn" ]; then
+		if [ "$temperature_state" = normal ]; then
+			logger -t re-cs-07-monitor -p daemon.warn \
+				"temperature reached $((temperature / 1000)) C"
+			temperature_state=warning
+		fi
+	elif [ "$temperature" -lt "$temperature_clear" ] && \
+		[ "$temperature_state" != normal ]; then
+		logger -t re-cs-07-monitor -p daemon.notice \
+			"temperature recovered to $((temperature / 1000)) C"
+		temperature_state=normal
+	fi
+}
+
+main() {
+	load_settings
+	[ "$enabled" = 1 ] || exit 0
+
+	temperature_state=normal
+	prepare_conntrack
+
+	while :; do
+		adjust_conntrack
+		monitor_temperature
+		sleep "$interval"
+	done
+}
+
+trap 'exit 0' INT TERM
+main

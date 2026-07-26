@@ -172,6 +172,19 @@ jobs:
           echo "===== Selected target ====="
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config
 
+          echo "===== Required acceleration and proxy path ====="
+          for required_config in \
+            CONFIG_PACKAGE_kmod-qca-nss-drv=y \
+            CONFIG_PACKAGE_kmod-qca-nss-ecm=y \
+            CONFIG_PACKAGE_kmod-nft-tproxy=y
+          do
+            if ! grep -qx "$required_config" .config; then
+              echo "ERROR: required config missing: $required_config"
+              exit 1
+            fi
+            echo "$required_config"
+          done
+
           make download -j8
 
           find dl -size -1024c -exec ls -l {} \;

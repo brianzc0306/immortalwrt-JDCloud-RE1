@@ -1,0 +1,63 @@
+#!/bin/sh
+
+print_temperature() {
+	local zone value type
+	for zone in /sys/class/thermal/thermal_zone*; do
+		[ -r "$zone/temp" ] || continue
+		value="$(cat "$zone/temp" 2>/dev/null)"
+		case "$value" in ''|*[!0-9]*) continue ;; esac
+		type="$(cat "$zone/type" 2>/dev/null)"
+		printf '  %-20s %d.%03d C\n' \
+			"${type:-$(basename "$zone")}" \
+			$((value / 1000)) $((value % 1000))
+	done
+}
+
+print_cpufreq() {
+	local policy governor current minimum maximum
+	for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+		[ -r "$policy/scaling_governor" ] || continue
+		governor="$(cat "$policy/scaling_governor" 2>/dev/null)"
+		current="$(cat "$policy/scaling_cur_freq" 2>/dev/null)"
+		minimum="$(cat "$policy/scaling_min_freq" 2>/dev/null)"
+		maximum="$(cat "$policy/scaling_max_freq" 2>/dev/null)"
+		printf '  %-10s governor=%-10s current=%s MHz range=%s-%s MHz\n' \
+			"$(basename "$policy")" "$governor" \
+			$((current / 1000)) $((minimum / 1000)) $((maximum / 1000))
+	done
+}
+
+count="$(cat /proc/sys/net/netfilter/nf_conntrack_count 2>/dev/null)"
+maximum="$(cat /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null)"
+case "$count" in
+	''|*[!0-9]*) usage=n/a ;;
+	*)
+		case "$maximum" in
+			''|*[!0-9]*|0) usage=n/a ;;
+			*) usage="$((count * 100 / maximum))%" ;;
+		esac
+	;;
+esac
+
+echo 'Conntrack'
+printf '  count=%s max=%s usage=%s\n' "${count:-n/a}" "${maximum:-n/a}" "$usage"
+
+echo 'Temperature'
+print_temperature
+
+echo 'CPU frequency (read-only)'
+print_cpufreq
+
+echo 'Acceleration and proxy path'
+printf '  NSS driver: %s\n' "$([ -d /sys/module/qca_nss_drv ] && echo loaded || echo not-loaded)"
+printf '  ECM:        %s\n' "$([ -d /sys/module/ecm ] && echo loaded || echo not-loaded)"
+printf '  flow offloading:    %s\n' "$(uci -q get firewall.@defaults[0].flow_offloading || echo 0)"
+printf '  hardware offloading: %s\n' "$(uci -q get firewall.@defaults[0].flow_offloading_hw || echo 0)"
+
+echo 'Nikki log files (RAM-backed /var)'
+for log_file in /var/log/nikki/app.log /var/log/nikki/core.log; do
+	[ -f "$log_file" ] || continue
+	printf '  %-28s %s bytes\n' "$log_file" "$(wc -c < "$log_file")"
+done
+
+echo 'Lucky keeps its web log in a bounded in-memory ring buffer.'

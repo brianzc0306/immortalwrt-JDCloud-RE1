@@ -25,6 +25,24 @@ git clone --depth=1 \
   https://github.com/gdy666/luci-app-lucky.git \
   package/lucky
 
+# Lucky 的应用日志是内存环形缓冲；关闭重复的 init 启停日志。
+# 上游目前读取 logger 选项但未使用，因此在构建时补上开关判断。
+sed -i \
+  's/config_get_bool logger $1 logger 1/config_get_bool logger $1 logger 0/' \
+  package/lucky/lucky/files/lucky.init
+sed -i \
+  's|^[[:space:]]*logger -t lucky -p warn "$1"|   [ "${logger:-0}" = "1" ] \&\& logger -t lucky -p warn "$1"|' \
+  package/lucky/lucky/files/lucky.init
+sed -i \
+  "s/option logger '1'/option logger '0'/" \
+  package/lucky/lucky/files/luckyuci
+
+if ! grep -Fq 'logger:-0' package/lucky/lucky/files/lucky.init || \
+   ! grep -Fq "option logger '0'" package/lucky/lucky/files/luckyuci; then
+  echo "ERROR: failed to apply Lucky logging policy"
+  exit 1
+fi
+
 # Nikki
 rm -rf package/nikki
 git clone --depth=1 -b main \
@@ -54,7 +72,8 @@ net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_rfc1337 = 1
 
-########## NAT and conntrack ##########
+########## NAT and adaptive conntrack baseline ##########
+# The runtime monitor raises this to 262144 at 75% actual usage.
 net.netfilter.nf_conntrack_max = 131072
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
@@ -74,6 +93,41 @@ net.ipv4.conf.default.accept_source_route = 0
 net.ipv4.conf.all.rp_filter = 0
 net.ipv4.conf.default.rp_filter = 0
 EOF
+
+
+# ============================================================
+# RE-CS-07 运行时策略与状态工具
+# ============================================================
+
+CUSTOM_FILES_DIR="${GITHUB_WORKSPACE:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}/files"
+
+if [ ! -d "$CUSTOM_FILES_DIR" ]; then
+  echo "ERROR: custom files directory not found: $CUSTOM_FILES_DIR"
+  exit 1
+fi
+
+install -d \
+  package/base-files/files/etc/config \
+  package/base-files/files/etc/init.d \
+  package/base-files/files/etc/uci-defaults \
+  package/base-files/files/usr/bin \
+  package/base-files/files/usr/sbin
+
+install -m 0644 \
+  "$CUSTOM_FILES_DIR/etc/config/re_cs_07" \
+  package/base-files/files/etc/config/re_cs_07
+install -m 0755 \
+  "$CUSTOM_FILES_DIR/etc/init.d/re-cs-07-monitor" \
+  package/base-files/files/etc/init.d/re-cs-07-monitor
+install -m 0755 \
+  "$CUSTOM_FILES_DIR/etc/uci-defaults/99-re-cs-07" \
+  package/base-files/files/etc/uci-defaults/99-re-cs-07
+install -m 0755 \
+  "$CUSTOM_FILES_DIR/usr/bin/re-cs-07-status" \
+  package/base-files/files/usr/bin/re-cs-07-status
+install -m 0755 \
+  "$CUSTOM_FILES_DIR/usr/sbin/re-cs-07-monitor" \
+  package/base-files/files/usr/sbin/re-cs-07-monitor
 
 
 # ============================================================
