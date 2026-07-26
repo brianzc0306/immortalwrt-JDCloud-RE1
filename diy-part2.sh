@@ -49,21 +49,13 @@ net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_timestamps = 1
 net.ipv4.tcp_mtu_probing = 1
 
-########## Buffer tuning for 2GB RAM ##########
-net.core.optmem_max = 65535
-net.core.rmem_max = 8388608
-net.core.wmem_max = 8388608
-net.ipv4.tcp_rmem = 4096 87380 8388608
-net.ipv4.tcp_wmem = 4096 65536 8388608
-
-########## Throughput and latency ##########
-net.core.netdev_max_backlog = 32768
+########## TCP resilience ##########
 net.ipv4.tcp_max_syn_backlog = 8192
 net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_rfc1337 = 1
 
 ########## NAT and conntrack ##########
-net.netfilter.nf_conntrack_max = 262144
+net.netfilter.nf_conntrack_max = 131072
 net.netfilter.nf_conntrack_tcp_timeout_close_wait = 60
 net.netfilter.nf_conntrack_tcp_timeout_fin_wait = 120
 net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120
