@@ -7,12 +7,21 @@ name: immortalwrt-nikki
 on:
   repository_dispatch:
   workflow_dispatch:
+    inputs:
+      build_variant:
+        description: 构建类型（稳定版或 OAF 测试版）
+        required: true
+        default: stable
+        type: choice
+        options:
+          - stable
+          - oaf-test
 
 permissions:
   contents: read
 
 concurrency:
-  group: immortalwrt-nikki-${{ github.ref }}
+  group: immortalwrt-nikki-${{ github.ref }}-${{ github.event.inputs.build_variant || 'stable' }}
   cancel-in-progress: true
 
 env:
@@ -20,6 +29,9 @@ env:
   REPO_BRANCH: main
   CONFIG_FILE: nikki.config
   DIY_P2_SH: diy-part2.sh
+  BUILD_VARIANT: ${{ github.event.inputs.build_variant || 'stable' }}
+  OAF_REPO_URL: https://github.com/destan19/OpenAppFilter.git
+  OAF_COMMIT: a189ad85e8fb461318533941963f0e2975274a19
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
@@ -33,6 +45,7 @@ jobs:
       contents: read
     outputs:
       release_tag: ${{ steps.release_info.outputs.release_tag }}
+      release_prerelease: ${{ steps.release_info.outputs.release_prerelease }}
 
     steps:
       - name: Checkout
@@ -162,6 +175,7 @@ jobs:
           mv "$CONFIG_FILE" openwrt/.config
           chmod +x "$DIY_P2_SH"
           cd openwrt
+          echo "Build variant: $BUILD_VARIANT"
           "$GITHUB_WORKSPACE/$DIY_P2_SH"
 
       - name: Download packages
@@ -184,6 +198,21 @@ jobs:
             fi
             echo "$required_config"
           done
+
+          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+            echo "===== Required OAF test packages ====="
+            for required_config in \
+              CONFIG_PACKAGE_luci-app-oaf=y \
+              CONFIG_PACKAGE_appfilter=y \
+              CONFIG_PACKAGE_kmod-oaf=y
+            do
+              if ! grep -qx "$required_config" .config; then
+                echo "ERROR: required OAF config missing: $required_config"
+                exit 1
+              fi
+              echo "$required_config"
+            done
+          fi
 
           make download -j8
 
@@ -284,6 +313,9 @@ jobs:
             echo "immortalwrt=$(git -C openwrt rev-parse HEAD)"
             echo "lucky=$(git -C openwrt/package/lucky rev-parse HEAD)"
             echo "nikki=$(git -C openwrt/package/nikki rev-parse HEAD)"
+            if [ -d openwrt/package/OpenAppFilter/.git ]; then
+              echo "openappfilter=$(git -C openwrt/package/OpenAppFilter rev-parse HEAD)"
+            fi
           } > "$RELEASE_DIR/source-versions.txt"
 
           (
@@ -306,18 +338,37 @@ jobs:
           steps.organize.outputs.status == 'success' &&
           env.UPLOAD_RELEASE == 'true'
         run: |
-          RELEASE_TAG="immortalwrt-nikki-$(date '+%Y.%m.%d-%H%M')"
+          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+            RELEASE_TAG="immortalwrt-oaf-test-$(date '+%Y.%m.%d-%H%M')"
+            RELEASE_TITLE="ImmortalWrt OAF 测试固件"
+            RELEASE_PLUGINS="Nikki、Lucky、OpenAppFilter（OAF）"
+            RELEASE_PRERELEASE=true
+          else
+            RELEASE_TAG="immortalwrt-nikki-$(date '+%Y.%m.%d-%H%M')"
+            RELEASE_TITLE="ImmortalWrt 固件"
+            RELEASE_PLUGINS="Nikki、Lucky"
+            RELEASE_PRERELEASE=false
+          fi
+
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "release_prerelease=$RELEASE_PRERELEASE" >> "$GITHUB_OUTPUT"
 
           {
-            echo "## ImmortalWrt 固件"
+            echo "## $RELEASE_TITLE"
             echo
             echo "- 设备：JDCloud RE-CS-07"
             echo "- 源码：VIKINGYFY/immortalwrt"
             echo "- 分支：$REPO_BRANCH"
+            echo "- 构建类型：$BUILD_VARIANT"
             echo "- 编译时间：$(date '+%Y-%m-%d %H:%M:%S %Z')"
             echo "- 默认地址：192.168.0.1"
-            echo "- 插件：Nikki、Lucky"
+            echo "- 插件：$RELEASE_PLUGINS"
+            if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+              echo "- OAF 默认状态：已安装但未启用，未预设设备或拦截规则"
+              echo "- 加速默认状态：保留 NSS/ECM，软件及硬件 Flow Offloading 关闭"
+              echo
+              echo "> 此版本为预发布测试固件，请先备份配置；仅用于验证《梦幻西游》识别和按设备拦截。"
+            fi
             echo
             echo "### 源码版本"
             echo '```text'
@@ -361,6 +412,7 @@ jobs:
         with:
           tag_name: ${{ needs.build.outputs.release_tag }}
           name: ${{ needs.build.outputs.release_tag }}
+          prerelease: ${{ needs.build.outputs.release_prerelease == 'true' }}
           body_path: release-output/release.txt
           files: release-output/*
           fail_on_unmatched_files: true
@@ -378,11 +430,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ "$BUILD_VARIANT" = "oaf-test" ]; then
+            RELEASE_PREFIX="immortalwrt-oaf-test-"
+          else
+            RELEASE_PREFIX="immortalwrt-nikki-"
+          fi
+
           gh release list \
             --repo "$GITHUB_REPOSITORY" \
             --limit 100 \
             --json tagName \
-            --jq '.[3:] | .[].tagName' |
+            --jq "map(select(.tagName | startswith(\"$RELEASE_PREFIX\"))) | .[3:] | .[].tagName" |
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             echo "Deleting old release: $tag"
