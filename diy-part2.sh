@@ -102,6 +102,43 @@ case "$FIRMWARE_FLAVOR" in
       exit 1
     fi
 
+    OAF_TEST_FILES_DIR="${GITHUB_WORKSPACE:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}/files/oaf-test"
+    if [ ! -d "$OAF_TEST_FILES_DIR" ]; then
+      echo "ERROR: OAF test files directory not found: $OAF_TEST_FILES_DIR"
+      exit 1
+    fi
+
+    install -d \
+      package/OpenAppFilter/luci-app-oaf/luasrc/controller \
+      package/OpenAppFilter/luci-app-oaf/luasrc/model/cbi/appfilter \
+      package/base-files/files/etc/config \
+      package/base-files/files/etc/init.d \
+      package/base-files/files/etc/uci-defaults
+
+    install -m 0644 \
+      "$OAF_TEST_FILES_DIR/luci/controller/mhxy_block.lua" \
+      package/OpenAppFilter/luci-app-oaf/luasrc/controller/mhxy_block.lua
+    install -m 0644 \
+      "$OAF_TEST_FILES_DIR/luci/model/cbi/appfilter/mhxy_block.lua" \
+      package/OpenAppFilter/luci-app-oaf/luasrc/model/cbi/appfilter/mhxy_block.lua
+    install -m 0644 \
+      "$OAF_TEST_FILES_DIR/etc/config/mhxy_block" \
+      package/base-files/files/etc/config/mhxy_block
+    install -m 0755 \
+      "$OAF_TEST_FILES_DIR/etc/init.d/mhxy-block" \
+      package/base-files/files/etc/init.d/mhxy-block
+    install -m 0755 \
+      "$OAF_TEST_FILES_DIR/etc/uci-defaults/98-mhxy-block" \
+      package/base-files/files/etc/uci-defaults/98-mhxy-block
+
+    if ! grep -Fq 'mhxy_block' \
+      package/OpenAppFilter/luci-app-oaf/luasrc/controller/mhxy_block.lua || \
+       ! grep -Fq '42.186.0.0/16' \
+      package/base-files/files/etc/init.d/mhxy-block; then
+      echo "ERROR: failed to install MHXY test controls"
+      exit 1
+    fi
+
     echo 'CONFIG_PACKAGE_luci-app-oaf=y' >> .config
     ;;
   *)

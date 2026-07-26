@@ -113,6 +113,19 @@ Get-FileHash .\固件文件名 -Algorithm SHA256
 - [gdy666/luci-app-lucky](https://github.com/gdy666/luci-app-lucky)
 - [destan19/OpenAppFilter](https://github.com/destan19/OpenAppFilter)
 
+## 梦幻西游拦截测试
+
+`oaf-test` 固件额外提供 **服务 → App Filter → 梦幻西游拦截（测试）** 页面。该功能默认关闭，只对页面中填写的固定 IPv4 地址生效；保存并应用后会立即重载独立的 nftables 规则。它不会停止 Nikki，也不会修改 HNAT、ECM 或 Flow Offloading 设置。启用后应彻底退出并重新启动游戏，使新连接经过拦截规则。
+
+规则来自 RE-CS-07 实机抓包验证；验证时 Nikki、HNAT 和 ECM 均保持运行，适用于当前观察到的《梦幻西游》服务器线路。服务器地址可能变化，且同一地址可能承载其他网易服务，因此该功能保持测试性质，不会加入稳定版，也不会默认启用。SSH 可用以下命令检查命中计数或立即关闭：
+
+```sh
+nft list chain inet mhxy_block forward
+uci set mhxy_block.main.enabled='0'
+uci commit mhxy_block
+/etc/init.d/mhxy-block restart
+```
+
 ## License
 
 [MIT](LICENSE)

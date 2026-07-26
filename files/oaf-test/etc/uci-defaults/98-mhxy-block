@@ -1,0 +1,5 @@
+#!/bin/sh
+
+/etc/init.d/mhxy-block enable
+
+exit 0
