@@ -1,8 +1,5 @@
 #
-# https://github.com/P3TERX/Actions-OpenWrt
-#
-# File: .github/workflows/immortalwrt-nikki.yml
-# Description: Build ImmortalWrt using GitHub Actions
+# Build ImmortalWrt for JDCloud RE-CS-07
 #
 
 name: immortalwrt-nikki
@@ -11,17 +8,17 @@ on:
   repository_dispatch:
   workflow_dispatch:
 
-# 发布 Release 和删除旧运行记录需要写权限
 permissions:
-  contents: write
-  actions: write
+  contents: read
+
+concurrency:
+  group: immortalwrt-nikki-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REPO_URL: https://github.com/VIKINGYFY/immortalwrt.git
   REPO_BRANCH: main
-  FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: nikki.config
-  DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
@@ -32,14 +29,16 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ steps.release_info.outputs.release_tag }}
 
     steps:
-      # 检出自定义编译仓库
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      # 初始化编译环境
-      - name: Initialization environment
+      - name: Initialize environment
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -51,9 +50,7 @@ jobs:
             /opt/hostedtoolcache/CodeQL
 
           sudo docker image prune --all --force
-
           sudo -E apt-get -qq update
-
           sudo -E apt-get -qq install \
             ack \
             antlr3 \
@@ -126,170 +123,177 @@ jobs:
 
           sudo -E apt-get -qq autoremove --purge
           sudo -E apt-get -qq clean
-
           sudo timedatectl set-timezone "$TZ"
           sudo mkdir -p /workdir
           sudo chown "$USER:$GROUPS" /workdir
 
-      # 拉取 ImmortalWrt 源码
-      - name: Clone source code
+      - name: Clone ImmortalWrt
         working-directory: /workdir
         run: |
           df -hT "$PWD"
-
           git clone \
             --depth=1 \
             --branch "$REPO_BRANCH" \
             "$REPO_URL" \
             openwrt
-
           ln -sfn /workdir/openwrt "$GITHUB_WORKSPACE/openwrt"
 
-      # 使用 ccache 加速重复编译
-      - name: Cache
-        uses: klever1988/cachewrtbuild@main
+      - name: Restore build cache
+        uses: klever1988/cachewrtbuild@b729f807837dbc3455d02fd35192660d9b662121 # main
         with:
           ccache: "true"
           prefix: ${{ github.workspace }}/openwrt
 
-      # 加载自定义 feeds
-      - name: Load custom feeds
-        run: |
-          if [ -e "$FEEDS_CONF" ]; then
-            mv "$FEEDS_CONF" openwrt/feeds.conf.default
-          fi
-
-          chmod +x "$DIY_P1_SH"
-
-          cd openwrt
-          "$GITHUB_WORKSPACE/$DIY_P1_SH"
-
-      # 更新 feeds
       - name: Update feeds
         working-directory: openwrt
         run: ./scripts/feeds update -a
 
-      # 安装 feeds
       - name: Install feeds
         working-directory: openwrt
         run: ./scripts/feeds install -a
 
-      # 加载配置并执行自定义脚本
-      - name: Load custom configuration
+      - name: Load configuration
         run: |
-          if [ -e files ]; then
-            mv files openwrt/files
-          fi
-
-          if [ -e "$CONFIG_FILE" ]; then
-            mv "$CONFIG_FILE" openwrt/.config
-          else
+          if [ ! -f "$CONFIG_FILE" ]; then
             echo "ERROR: $CONFIG_FILE not found"
             exit 1
           fi
 
+          mv "$CONFIG_FILE" openwrt/.config
           chmod +x "$DIY_P2_SH"
-
           cd openwrt
           "$GITHUB_WORKSPACE/$DIY_P2_SH"
 
-      # 生成最终配置并下载源码包
       - name: Download packages
         working-directory: openwrt
         run: |
           make defconfig
 
           echo "===== Selected target ====="
-          grep '^CONFIG_TARGET.*DEVICE.*=y' .config || true
+          grep '^CONFIG_TARGET.*DEVICE.*=y' .config
 
           make download -j8
 
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      # 编译固件
       - name: Compile firmware
         id: compile
         working-directory: openwrt
         run: |
           echo "$(nproc) thread compile"
+          set -o pipefail
 
-          make -j"$(nproc)" || \
-          make -j1 || \
-          make -j1 V=s
+          if ! make -j"$(nproc)" 2>&1 | tee build.log; then
+            echo "Parallel build failed; retrying with verbose single-thread output"
+            make -j1 V=s 2>&1 | tee -a build.log
+          fi
 
           echo "status=success" >> "$GITHUB_OUTPUT"
 
-          grep '^CONFIG_TARGET.*DEVICE.*=y' .config |
-            sed -r 's/.*DEVICE_(.*)=y/\1/' \
-            > DEVICE_NAME
+          DEVICE_NAME="$(
+            grep '^CONFIG_TARGET.*DEVICE.*=y' .config |
+              sed -r 's/.*DEVICE_(.*)=y/\1/'
+          )"
 
-          if [ -s DEVICE_NAME ]; then
-            echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> "$GITHUB_ENV"
+          if [ -n "$DEVICE_NAME" ]; then
+            echo "DEVICE_NAME=_$DEVICE_NAME" >> "$GITHUB_ENV"
           fi
 
           echo "FILE_DATE=_$(date '+%Y%m%d%H%M')" >> "$GITHUB_ENV"
 
-      # 显示磁盘空间
-      - name: Check space usage
+      - name: Upload failed build log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: build-log-${{ github.run_id }}
+          path: openwrt/build.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Check disk usage
         if: always()
         run: df -hT
 
-      # 上传完整 bin 目录
-      - name: Upload bin directory
+      - name: Upload complete bin directory
         if: >-
           steps.compile.outputs.status == 'success' &&
           env.UPLOAD_BIN_DIR == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
           path: openwrt/bin
           compression-level: 6
+          retention-days: 7
 
-      # 整理固件文件
-      - name: Organize firmware
+      - name: Organize release files
         id: organize
         if: >-
           steps.compile.outputs.status == 'success' &&
-          env.UPLOAD_FIRMWARE == 'true' &&
-          !cancelled()
+          env.UPLOAD_FIRMWARE == 'true'
         run: |
-          FIRMWARE_DIR="$(find openwrt/bin/targets -mindepth 2 -maxdepth 2 -type d | head -n 1)"
+          TARGET_BOARD="$(sed -n 's/^CONFIG_TARGET_BOARD="\([^"]*\)"/\1/p' openwrt/.config)"
+          TARGET_SUBTARGET="$(sed -n 's/^CONFIG_TARGET_SUBTARGET="\([^"]*\)"/\1/p' openwrt/.config)"
 
-          if [ -z "$FIRMWARE_DIR" ] || [ ! -d "$FIRMWARE_DIR" ]; then
-            echo "ERROR: Firmware directory not found"
+          if [ -z "$TARGET_BOARD" ] || [ -z "$TARGET_SUBTARGET" ]; then
+            echo "ERROR: Unable to determine target directory from .config"
             exit 1
           fi
 
-          rm -rf "$FIRMWARE_DIR/packages"
+          case "$TARGET_BOARD/$TARGET_SUBTARGET" in
+            *[!A-Za-z0-9._/-]*)
+              echo "ERROR: Unsafe target path"
+              exit 1
+              ;;
+          esac
 
-          echo "FIRMWARE=$FIRMWARE_DIR" >> "$GITHUB_ENV"
+          FIRMWARE_DIR="$GITHUB_WORKSPACE/openwrt/bin/targets/$TARGET_BOARD/$TARGET_SUBTARGET"
+          RELEASE_DIR="$GITHUB_WORKSPACE/release-output"
+
+          if [ ! -d "$FIRMWARE_DIR" ]; then
+            echo "ERROR: Firmware directory not found: $FIRMWARE_DIR"
+            exit 1
+          fi
+
+          mkdir -p "$RELEASE_DIR"
+          find "$FIRMWARE_DIR" -maxdepth 1 -type f -exec cp -t "$RELEASE_DIR" -- {} +
+          cp openwrt/.config "$RELEASE_DIR/config.seed"
+
+          MANIFEST_FILE="$(find "$RELEASE_DIR" -maxdepth 1 -type f -name '*.manifest' -print -quit)"
+          if [ -n "$MANIFEST_FILE" ]; then
+            cp "$MANIFEST_FILE" "$RELEASE_DIR/packages.manifest"
+          else
+            sed -n 's/^CONFIG_PACKAGE_\(.*\)=y$/\1/p' openwrt/.config |
+              sort > "$RELEASE_DIR/packages.manifest"
+          fi
+
+          {
+            echo "immortalwrt=$(git -C openwrt rev-parse HEAD)"
+            echo "lucky=$(git -C openwrt/package/lucky rev-parse HEAD)"
+            echo "nikki=$(git -C openwrt/package/nikki rev-parse HEAD)"
+          } > "$RELEASE_DIR/source-versions.txt"
+
+          (
+            cd "$RELEASE_DIR"
+            find . -maxdepth 1 -type f ! -name sha256sums -printf '%P\0' |
+              sort -z |
+              xargs -0 sha256sum > sha256sums
+          )
+
+          echo "FIRMWARE_DIR=$FIRMWARE_DIR" >> "$GITHUB_ENV"
+          echo "RELEASE_DIR=$RELEASE_DIR" >> "$GITHUB_ENV"
           echo "status=success" >> "$GITHUB_OUTPUT"
 
-          echo "===== Firmware files ====="
-          find "$FIRMWARE_DIR" -maxdepth 1 -type f -printf '%f\n'
+          echo "===== Release files ====="
+          find "$RELEASE_DIR" -maxdepth 1 -type f -printf '%f\n' | sort
 
-      # 上传固件 Artifact
-      - name: Upload firmware directory
-        if: >-
-          steps.organize.outputs.status == 'success' &&
-          !cancelled()
-        uses: actions/upload-artifact@v7
-        with:
-          name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-          path: ${{ env.FIRMWARE }}
-          compression-level: 6
-
-      # 生成 Release 标签和说明
       - name: Generate release information
-        id: tag
+        id: release_info
         if: >-
           steps.organize.outputs.status == 'success' &&
-          env.UPLOAD_RELEASE == 'true' &&
-          !cancelled()
+          env.UPLOAD_RELEASE == 'true'
         run: |
           RELEASE_TAG="immortalwrt-nikki-$(date '+%Y.%m.%d-%H%M')"
-
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
 
           {
@@ -299,52 +303,88 @@ jobs:
             echo "- 源码：VIKINGYFY/immortalwrt"
             echo "- 分支：$REPO_BRANCH"
             echo "- 编译时间：$(date '+%Y-%m-%d %H:%M:%S %Z')"
-            echo "- Nikki：已包含"
-          } > release.txt
+            echo "- 默认地址：192.168.0.1"
+            echo "- 插件：Nikki、Lucky"
+            echo
+            echo "### 源码版本"
+            echo '```text'
+            cat "$RELEASE_DIR/source-versions.txt"
+            echo '```'
+            echo
+            echo "请使用 sha256sums 校验下载文件。"
+          } > "$RELEASE_DIR/release.txt"
 
-          echo "status=success" >> "$GITHUB_OUTPUT"
+          (
+            cd "$RELEASE_DIR"
+            sha256sum release.txt >> sha256sums
+          )
 
-      # 上传 GitHub Release
-      - name: Upload firmware to release
-        if: >-
-          steps.tag.outputs.status == 'success' &&
-          !cancelled()
-        uses: softprops/action-gh-release@v3
+      - name: Upload firmware bundle
+        if: steps.organize.outputs.status == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          name: ${{ steps.tag.outputs.release_tag }}
-          body_path: release.txt
-          files: ${{ env.FIRMWARE }}/*
+          name: release-bundle-${{ github.run_id }}
+          path: release-output
+          compression-level: 6
+          retention-days: 14
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: needs.build.outputs.release_tag != ''
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download firmware bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-bundle-${{ github.run_id }}
+          path: release-output
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@c12583777ecdfd3be55c69cf75464299dc01057e # v3
+        with:
+          tag_name: ${{ needs.build.outputs.release_tag }}
+          name: ${{ needs.build.outputs.release_tag }}
+          body_path: release-output/release.txt
+          files: release-output/*
           fail_on_unmatched_files: true
 
-      # 删除旧 Release，只保留最新 3 个
+  cleanup:
+    needs: release
+    if: always() && needs.release.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
       - name: Remove old releases
-        if: >-
-          success() &&
-          env.UPLOAD_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release list \
+            --repo "$GITHUB_REPOSITORY" \
             --limit 100 \
             --json tagName \
             --jq '.[3:] | .[].tagName' |
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
-
             echo "Deleting old release: $tag"
             gh release delete "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
               --cleanup-tag \
               --yes
           done
 
-      # 删除旧工作流记录，只保留最近 2 个已完成记录
       - name: Remove old workflow runs
-        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh run list \
+            --repo "$GITHUB_REPOSITORY" \
             --workflow "$GITHUB_WORKFLOW" \
             --limit 100 \
             --json databaseId,status,createdAt \
@@ -357,7 +397,6 @@ jobs:
             ' |
           while IFS= read -r run_id; do
             [ -n "$run_id" ] || continue
-
             echo "Deleting old workflow run: $run_id"
-            gh run delete "$run_id"
+            gh run delete "$run_id" --repo "$GITHUB_REPOSITORY"
           done
