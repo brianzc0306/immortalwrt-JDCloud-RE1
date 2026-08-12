@@ -165,14 +165,11 @@ jobs:
           cd openwrt
           "$GITHUB_WORKSPACE/$DIY_P2_SH"
 
-      - name: Clean stale Linux build files
-        working-directory: openwrt
-        run: make target/linux/clean
-
       - name: Download packages
         working-directory: openwrt
         run: |
           make defconfig
+          make target/linux/clean
 
           echo "===== Selected target ====="
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config
