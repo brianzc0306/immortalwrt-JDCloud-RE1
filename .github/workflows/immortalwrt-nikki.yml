@@ -139,12 +139,6 @@ jobs:
             openwrt
           ln -sfn /workdir/openwrt "$GITHUB_WORKSPACE/openwrt"
 
-      - name: Restore build cache
-        uses: klever1988/cachewrtbuild@b729f807837dbc3455d02fd35192660d9b662121 # main
-        with:
-          ccache: "false"
-          prefix: ${{ github.workspace }}/openwrt
-
       - name: Update feeds
         working-directory: openwrt
         run: ./scripts/feeds update -a
@@ -169,7 +163,6 @@ jobs:
         working-directory: openwrt
         run: |
           make defconfig
-          make target/linux/clean
 
           echo "===== Selected target ====="
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config
