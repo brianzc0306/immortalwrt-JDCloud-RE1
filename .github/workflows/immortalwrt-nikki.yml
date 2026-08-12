@@ -142,7 +142,7 @@ jobs:
       - name: Restore build cache
         uses: klever1988/cachewrtbuild@b729f807837dbc3455d02fd35192660d9b662121 # main
         with:
-          ccache: "true"
+          ccache: "false"
           prefix: ${{ github.workspace }}/openwrt
 
       - name: Update feeds
@@ -164,6 +164,10 @@ jobs:
           chmod +x "$DIY_P2_SH"
           cd openwrt
           "$GITHUB_WORKSPACE/$DIY_P2_SH"
+
+      - name: Clean stale Linux build files
+        working-directory: openwrt
+        run: make target/linux/clean
 
       - name: Download packages
         working-directory: openwrt
