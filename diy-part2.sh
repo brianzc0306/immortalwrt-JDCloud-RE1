@@ -25,24 +25,6 @@ git clone --depth=1 \
   https://github.com/gdy666/luci-app-lucky.git \
   package/lucky
 
-# Lucky 的应用日志是内存环形缓冲；关闭重复的 init 启停日志。
-# 上游目前读取 logger 选项但未使用，因此在构建时补上开关判断。
-sed -i \
-  's/config_get_bool logger $1 logger 1/config_get_bool logger $1 logger 0/' \
-  package/lucky/lucky/files/lucky.init
-sed -i \
-  's|^[[:space:]]*logger -t lucky -p warn "$1"|   [ "${logger:-0}" = "1" ] \&\& logger -t lucky -p warn "$1"|' \
-  package/lucky/lucky/files/lucky.init
-sed -i \
-  "s/option logger '1'/option logger '0'/" \
-  package/lucky/lucky/files/luckyuci
-
-if ! grep -Fq 'logger:-0' package/lucky/lucky/files/lucky.init || \
-   ! grep -Fq "option logger '0'" package/lucky/lucky/files/luckyuci; then
-  echo "ERROR: failed to apply Lucky logging policy"
-  exit 1
-fi
-
 # Nikki
 rm -rf package/nikki
 git clone --depth=1 -b main \
