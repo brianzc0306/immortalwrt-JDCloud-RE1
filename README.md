@@ -4,14 +4,14 @@
 
 ## 固件信息
 
-- 上游源码：[VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
-- 构建分支：`owrt`
+- 上游源码：[immortalwrt](https://github.com/immortalwrt/immortalwrt)
+- 构建分支：`master`
 - 目标平台：`qualcommax/ipq60xx`
 - 目标设备：`jdcloud_re-cs-07`
 - 默认管理地址：`192.168.0.1`
 - 默认界面：简体中文 LuCI + Argon 主题
 - 主要插件：Nikki、Lucky、msd_lite、UPnP
-- 网络优化：BBR、TCP buffer 调优、NSS/ECM、动态 Conntrack 上限与 TProxy 兼容策略
+- 网络优化：BBR、TCP buffer 调优、动态 Conntrack 上限与 TProxy 兼容策略
 
 > RE-CS-07 本身不提供 Wi-Fi。本仓库会在构建时禁用无线用户态组件和明确不需要的 NSS 隧道模块。
 
@@ -27,8 +27,7 @@
 ## RE-CS-07 运行策略
 
 - Conntrack 默认上限为 `131072`；实际连接数达到该值的 75% 时，本次开机自动提升到 `262144`，重启后重新从低档观察，避免长期无条件放大连接表。TCP established 超时从内核默认的 7440 秒收紧到 3600 秒，减少死连接白占表项；监控进程同时盯 `insert_failed`/`drop` 计数，连接表真打满丢包时会在日志中记录。
-- 保留构建源默认提供的 NSS 核心与 ECM，并由构建流程确认 `kmod-qca-nss-drv`、`kmod-qca-nss-ecm` 和 Nikki 所需的 `kmod-nft-tproxy` 均已选中。
-- 默认关闭防火墙软件及硬件 Flow Offloading，避免与 NSS/ECM、Nikki 的 nftables 标记和 TProxy 路径重复加速。
+- 默认关闭防火墙软件及硬件 Flow Offloading，避免与Nikki 的 nftables 标记和 TProxy 路径重复加速。
 - Nikki 核心日志级别为 `warning`，应用日志和核心日志各以 1 MB 为清理阈值；日志位于 RAM 支撑的 `/var/log`。Lucky 使用有上限的内存日志，并关闭重复的 init 启停消息。
 - 不修改 CPU governor 或频率上下限，继续使用上游动态调频和内核热管理；温度达到 80°C、90°C 或降回 75°C 以下时才记录状态变化，避免周期性刷日志。
 
@@ -91,7 +90,6 @@ Get-FileHash .\固件文件名 -Algorithm SHA256
 ## 致谢
 
 - [P3TERX/Actions-OpenWrt](https://github.com/P3TERX/Actions-OpenWrt)
-- [VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
 - [nikkinikki-org/OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki)
 - [gdy666/luci-app-lucky](https://github.com/gdy666/luci-app-lucky)
 
