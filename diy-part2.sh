@@ -12,11 +12,37 @@ ROOT_DIR="${GITHUB_WORKSPACE:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
 cd "$ROOT_DIR"
 
 # ============================================================
-# 修改默认 LAN 地址
+# 修改默认 LAN 地址：兼容不同 ImmortalWRT 源码结构
 # ============================================================
 
-sed -i 's/192\.168\.1\.1/192.168.0.1/g' \
-  package/base-files/files/bin/config_generate
+LAN_IP="192.168.0.1"
+CONFIG_FILE="package/base-files/files/bin/config_generate"
+
+if [ -f "$CONFIG_FILE" ]; then
+  sed -i "s/192\.168\.1\.1/${LAN_IP}/g" "$CONFIG_FILE"
+  echo "===== Default LAN IP updated in config_generate ====="
+else
+  echo "===== config_generate not found; using uci-defaults ====="
+
+  mkdir -p package/base-files/files/etc/uci-defaults
+
+  cat > package/base-files/files/etc/uci-defaults/99-default-lan-ip <<'EOF'
+#!/bin/sh
+
+LAN_IP="192.168.0.1"
+
+if [ "$(uci -q get network.lan.ipaddr)" != "$LAN_IP" ]; then
+    uci set network.lan.ipaddr="$LAN_IP"
+    uci commit network
+fi
+
+exit 0
+EOF
+
+  chmod 0755 package/base-files/files/etc/uci-defaults/99-default-lan-ip
+
+  echo "===== Default LAN IP will be set to ${LAN_IP} on first boot ====="
+fi
 
 # ============================================================
 # 拉取第三方插件
