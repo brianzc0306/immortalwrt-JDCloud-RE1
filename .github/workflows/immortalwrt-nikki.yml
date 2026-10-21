@@ -1,5 +1,5 @@
-#
 # Build ImmortalWrt for JDCloud RE-CS-07
+#
 #
 
 name: immortalwrt-nikki
@@ -167,10 +167,8 @@ jobs:
           echo "===== Selected target ====="
           grep '^CONFIG_TARGET.*DEVICE.*=y' .config
 
-          echo "===== Required acceleration and proxy path ====="
+          echo "===== Required proxy path ====="
           for required_config in \
-            CONFIG_PACKAGE_kmod-qca-nss-drv=y \
-            CONFIG_PACKAGE_kmod-qca-nss-ecm=y \
             CONFIG_PACKAGE_kmod-nft-tproxy=y
           do
             if ! grep -qx "$required_config" .config; then
@@ -310,7 +308,7 @@ jobs:
             echo "## ImmortalWrt 固件"
             echo
             echo "- 设备：JDCloud RE-CS-07"
-            echo "- 源码：VIKINGYFY/immortalwrt"
+            echo "- 源码仓库：$REPO_URL"
             echo "- 分支：$REPO_BRANCH"
             echo "- 编译时间：$(date '+%Y-%m-%d %H:%M:%S %Z')"
             echo "- 默认地址：192.168.0.1"
