@@ -4,8 +4,8 @@
 
 ## 固件信息
 
-- 上游源码：[immortalwrt](https://github.com/immortalwrt/immortalwrt)
-- 构建分支：`master`
+- 上游源码：[VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
+- 构建分支：`owrt`
 - 目标平台：`qualcommax/ipq60xx`
 - 目标设备：`jdcloud_re-cs-07`
 - 默认管理地址：`192.168.0.1`
