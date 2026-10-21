@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# NSS/ECM is the forwarding fast path. Do not stack firewall flow offloading
+# Keep firewall flow offloading disabled to avoid bypassing Nikki TProxy.
 # on top of it, especially while Nikki relies on nftables marks and TProxy.
 if uci -q get firewall.@defaults[0] > /dev/null; then
 	uci -q set firewall.@defaults[0].flow_offloading='0'
