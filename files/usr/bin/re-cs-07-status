@@ -49,8 +49,9 @@ echo 'CPU frequency (read-only)'
 print_cpufreq
 
 echo 'Acceleration and proxy path'
-printf '  NSS driver: %s\n' "$([ -d /sys/module/qca_nss_drv ] && echo loaded || echo not-loaded)"
-printf '  ECM:        %s\n' "$([ -d /sys/module/ecm ] && echo loaded || echo not-loaded)"
+# PPE 路径：NSS/ECM 已弃用，卸载走 nft flowtable（内核模块 + firewall 开关）。
+printf '  nf_flow_table module: %s\n' "$([ -d /sys/module/nf_flow_table ] && echo loaded || echo not-loaded)"
+printf '  nft_flow_offload module: %s\n' "$([ -d /sys/module/nft_flow_offload ] && echo loaded || echo not-loaded)"
 printf '  flow offloading:    %s\n' "$(uci -q get firewall.@defaults[0].flow_offloading || echo 0)"
 printf '  hardware offloading: %s\n' "$(uci -q get firewall.@defaults[0].flow_offloading_hw || echo 0)"
 
