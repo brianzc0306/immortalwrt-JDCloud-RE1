@@ -230,28 +230,3 @@ sed -i '/^CONFIG_PACKAGE_zram-swap=/d' .config
 echo "CONFIG_PACKAGE_zram-swap=y" >> .config
 
 echo "===== Build optimizations applied (LTO / gc-sections / zram / nft-offload) ====="
-
-# =========================================================
-# 说明（不写入固件，仅注释）
-# =========================================================
-# 1. Flow Offloading 与 Nikki TPROXY 冲突，默认保持关闭（uci-defaults 已处理）。
-#    - 只要 Nikki 在 TPROXY 模式运行，就不要开 flow_offloading，
-#      卸载连接绕过 nftables，代理规则不生效、流量直连泄漏。
-#    - 只有关闭/移除代理后才考虑开启：
-#        uci set firewall.@defaults[0].flow_offloading='1'
-#        uci set firewall.@defaults[0].flow_offloading_hw='1'
-#        uci commit firewall && /etc/init.d/firewall restart
-#    - 验证卸载是否生效：cat /proc/net/netfilter/nf_flowtable 或
-#      dmesg | grep -i flow
-#
-# 2. Nikki 建议使用 TPROXY 模式（TCP+UDP 均支持，优于 TUN 的上下文切换开销）：
-#    在 Nikki 的 LuCI 设置中将代理模式设为 TPROXY。
-#
-# 3. EDMA 中断分散（RX→CPU1，TX→CPU2）与 NAPI 线程绑定由固件处理；
-#    如需核查可运行：
-#      cat /proc/interrupts | grep edma
-#      taskset -pc <NAPI线程TID>
-#
-# 4. （可选）若完全不需要无线且想省内存，把 ath11k 相关包从设备定义里去掉：
-#    target/linux/qualcommax/image/ipq60xx.mk 中 re-cs-07 的 DEVICE_PACKAGES
-#    （如 kmod-ath11k-pci / ath11k-firmware-qcn*），.config 无法关闭这类强制包。
