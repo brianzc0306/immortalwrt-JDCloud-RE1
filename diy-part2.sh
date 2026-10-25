@@ -137,15 +137,6 @@ fi
 # =========================================================
 # 精简无线组件（确认不用无线再执行本段）
 # =========================================================
-# 说明：
-#   * RE-CS-07 硬件本身带 2.4G/5G（ath11k），本段执行后无线接口将不可用。
-#   * 本仓库 workflow 中 make defconfig 在 diy-part2 之后执行：
-#     - include/target.mk 的 sed 有效，能阻止默认包被 defconfig 重新拉起；
-#     - 下方 disable_package 写入的 "# ... is not set" 也会被 defconfig 保留。
-#     两者互为双保险，可同时保留。
-#   * 若还想省内存，ath11k 内核包属于设备级 DEVICE_PACKAGES
-#     （target/linux/qualcommax/image/ipq60xx.mk 中 re-cs-07 定义），
-#     .config 关不掉，需改对应 .mk——见文末注释 4。
 
 # 用通用正则剥离 target.mk 中所有无线相关默认包，避免 make defconfig 重新拉起
 sed -i -E 's/\b(wpad[^[:space:]]*|hostapd[^[:space:]]*|wpa-supplicant[^[:space:]]*|wireless-regdb)\b//g' \
@@ -214,12 +205,6 @@ fi
 # =========================================================
 # PPE 硬件卸载组件（.config 追加，仅预留，不自动开启）
 # =========================================================
-# 说明：ipq60xx 当前源码走 PPE 路径（NSS/ECM 已弃用，勿再加 qca-nss-ecm / nss-firmware）。
-#       kmod-nft-offload 是 nft flowtable offload 的内核模块，只有把
-#       firewall flow_offloading(_hw) 置 1 时才会被使用。
-#       【重要】Nikki TPROXY 运行期间必须保持 flow offloading 关闭
-#       （files/etc/uci-defaults/99-re-cs-07 已处理），否则代理流量会绕过
-#       nftables 直连泄漏。包名以 make menuconfig 搜 nft-offload 为准。
 
 # 确保 .config 末尾有换行
 [ -n "$(tail -c1 .config)" ] && echo >> .config
